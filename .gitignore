@@ -1,0 +1,78 @@
+# Build directories
+build/
+Build/
+BUILD/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Visual Studio / MSBuild
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+*.sbr
+*.scc
+*.VC.db
+*.VC.VC.opendb
+*.vcpkg.applocal.ps1
+
+# Compiled binaries
+*.dll
+*.exe
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.exp
+
+# Debug files
+*.dSYM/
+
+# IDE files
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# FetchContent downloads
+_deps/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
