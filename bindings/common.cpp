@@ -84,6 +84,7 @@ sol::object MetadataToLua(sol::state_view lua, BNMetadata* md) {
     switch (type) {
         case BooleanDataType:
             return sol::make_object(lua, BNMetadataGetBoolean(md));
+
         case StringDataType: {
             char* str = BNMetadataGetString(md);
             if (!str) {
@@ -93,158 +94,168 @@ sol::object MetadataToLua(sol::state_view lua, BNMetadata* md) {
             BNFreeString(str);
             return result;
         }
+
         case UnsignedIntegerDataType:
             return sol::make_object(lua, BNMetadataGetUnsignedInteger(md));
+
         case SignedIntegerDataType:
             return sol::make_object(lua, BNMetadataGetSignedInteger(md));
+
         case DoubleDataType:
             return sol::make_object(lua, BNMetadataGetDouble(md));
+
+        case RawDataType: {
+            size_t size = 0;
+            uint8_t* buffer = BNMetadataGetRaw(md, &size);
+            if (!buffer) {
+                return sol::make_object(lua, std::string());
+            }
+            // Construct a Lua string from the (pointer, length) pair so
+            // embedded null bytes round-trip correctly. BNFreeMetadataRaw
+            // must be called regardless of construction success.
+            std::string raw(reinterpret_cast<const char*>(buffer), size);
+            BNFreeMetadataRaw(buffer);
+            return sol::make_object(lua, std::move(raw));
+        }
+
         case KeyValueDataType: {
             BNMetadataValueStore* store = BNMetadataGetValueStore(md);
             if (!store) {
                 return sol::make_object(lua, sol::nil);
             }
-            sol::table tbl = lua.create_table();
+            sol::table tbl = lua.create_table(0, static_cast<int>(store->size));
             for (size_t i = 0; i < store->size; ++i) {
-                BNMetadataType vtype = BNMetadataGetType(store->values[i]);
-                switch (vtype) {
-                    case StringDataType: {
-                        char* s = BNMetadataGetString(store->values[i]);
-                        if (s) {
-                            tbl[store->keys[i]] = std::string(s);
-                            BNFreeString(s);
-                        }
-                        break;
-                    }
-                    case BooleanDataType:
-                        tbl[store->keys[i]] =
-                            BNMetadataGetBoolean(store->values[i]);
-                        break;
-                    case SignedIntegerDataType:
-                        tbl[store->keys[i]] =
-                            BNMetadataGetSignedInteger(store->values[i]);
-                        break;
-                    case UnsignedIntegerDataType:
-                        tbl[store->keys[i]] =
-                            BNMetadataGetUnsignedInteger(store->values[i]);
-                        break;
-                    case DoubleDataType:
-                        tbl[store->keys[i]] =
-                            BNMetadataGetDouble(store->values[i]);
-                        break;
-                    default:
-                        break;
-                }
+                // Recursive decode - every nested value comes back as
+                // whatever native Lua type MetadataToLua produces.
+                tbl[store->keys[i]] = MetadataToLua(lua, store->values[i]);
             }
             sol::object result = sol::make_object(lua, tbl);
             BNFreeMetadataValueStore(store);
             return result;
         }
-        default: {
-            char* json = BNMetadataGetJsonString(md);
-            if (!json) {
-                return sol::make_object(lua, sol::nil);
+
+        case ArrayDataType: {
+            size_t size = BNMetadataSize(md);
+            sol::table tbl = lua.create_table(static_cast<int>(size), 0);
+            for (size_t i = 0; i < size; ++i) {
+                BNMetadata* element = BNMetadataGetForIndex(md, i);
+                // BNMetadataGetForIndex returns a NEW reference that the
+                // caller must free, mirroring Python metadata.py:186.
+                tbl[i + 1] = MetadataToLua(lua, element);
+                if (element) {
+                    BNFreeMetadata(element);
+                }
             }
-            sol::object result = sol::make_object(lua, std::string(json));
-            BNFreeString(json);
-            return result;
+            return sol::make_object(lua, tbl);
         }
+
+        case InvalidDataType:
+        default:
+            // InvalidDataType is a sentinel in Python (metadata.py:220
+            // raises TypeError); from Lua a throw here would collapse
+            // the whole call into an error, so return nil instead and
+            // let callers decide.
+            return sol::make_object(lua, sol::nil);
     }
 }
 
-BNMetadata* MetadataFromLua(sol::object value) {
+BNMetadata* MetadataFromLua(sol::object value, bool prefer_unsigned) {
+    // Booleans must be tested before numbers; sol::is<bool> and
+    // sol::is<int64_t> both return true for a Lua bool under some sol2
+    // builds, and an accidental bool-to-integer coercion would lose
+    // type information on the way through BN.
     if (value.is<bool>()) {
         return BNCreateMetadataBooleanData(value.as<bool>());
     }
+
     if (value.is<std::string>()) {
-        return BNCreateMetadataStringData(value.as<std::string>().c_str());
+        // Lua strings are 8-bit clean; pass them through as StringData.
+        // There is no Lua-level "raw bytes" distinction, so Raw is a
+        // decode-only variant - encoding always produces StringData.
+        const std::string& s = value.as<std::string>();
+        return BNCreateMetadataStringData(s.c_str());
     }
+
     if (value.get_type() == sol::type::number) {
         double d = value.as<double>();
         if (d == std::floor(d) && d >= static_cast<double>(INT64_MIN) &&
             d <= static_cast<double>(INT64_MAX)) {
-            return BNCreateMetadataSignedIntegerData(static_cast<int64_t>(d));
+            if (prefer_unsigned && d >= 0.0) {
+                return BNCreateMetadataUnsignedIntegerData(
+                    static_cast<uint64_t>(d));
+            }
+            return BNCreateMetadataSignedIntegerData(
+                static_cast<int64_t>(d));
         }
         return BNCreateMetadataDoubleData(d);
     }
+
     if (!value.is<sol::table>()) {
         return nullptr;
     }
 
     sol::table tbl = value.as<sol::table>();
 
-    // Detect a 1-indexed sequential array.
-    bool isArray = true;
-    size_t expectedIdx = 1;
+    // Detect 1-indexed sequential array vs string-keyed map.
+    bool is_array = true;
+    size_t expected_idx = 1;
     for (auto& kv : tbl) {
-        if (!kv.first.is<size_t>() || kv.first.as<size_t>() != expectedIdx) {
-            isArray = false;
+        if (!kv.first.is<size_t>() ||
+            kv.first.as<size_t>() != expected_idx) {
+            is_array = false;
             break;
         }
-        ++expectedIdx;
+        ++expected_idx;
     }
 
-    if (isArray && expectedIdx > 1) {
-        std::vector<std::string> strStorage;
-        bool allStrings = true;
-        for (auto& kv : tbl) {
-            if (!kv.second.is<std::string>()) {
-                allStrings = false;
-                break;
+    if (is_array && expected_idx > 1) {
+        // ArrayDataType - recurse per element via BNMetadataArrayAppend.
+        // Each appended child metadata handle is owned by the array
+        // after append, so free children only on failure paths.
+        BNMetadata* array = BNCreateMetadataOfType(ArrayDataType);
+        if (!array) return nullptr;
+        for (size_t i = 1; i < expected_idx; ++i) {
+            sol::object element = tbl[i];
+            BNMetadata* child = MetadataFromLua(element, prefer_unsigned);
+            if (!child) {
+                BNFreeMetadata(array);
+                return nullptr;
             }
-            strStorage.push_back(kv.second.as<std::string>());
-        }
-        if (allStrings && !strStorage.empty()) {
-            std::vector<const char*> strValues;
-            strValues.reserve(strStorage.size());
-            for (const auto& s : strStorage) {
-                strValues.push_back(s.c_str());
+            bool ok = BNMetadataArrayAppend(array, child);
+            BNFreeMetadata(child);
+            if (!ok) {
+                BNFreeMetadata(array);
+                return nullptr;
             }
-            return BNCreateMetadataStringListData(strValues.data(),
-                                                  strValues.size());
         }
-        return nullptr;
+        return array;
     }
 
-    // String-keyed table -> key-value store of scalars.
-    std::vector<std::string> keyStorage;
-    std::vector<BNMetadata*> values;
+    // Empty tables and string-keyed tables -> KeyValueDataType.
+    // Build via BNCreateMetadataOfType + BNMetadataSetValueForKey so
+    // each value can be recursively encoded.
+    BNMetadata* store = BNCreateMetadataOfType(KeyValueDataType);
+    if (!store) return nullptr;
     for (auto& kv : tbl) {
         if (!kv.first.is<std::string>()) {
             continue;
         }
-        BNMetadata* val = nullptr;
-        if (kv.second.is<bool>()) {
-            val = BNCreateMetadataBooleanData(kv.second.as<bool>());
-        } else if (kv.second.is<std::string>()) {
-            val = BNCreateMetadataStringData(
-                kv.second.as<std::string>().c_str());
-        } else if (kv.second.is<int64_t>()) {
-            val = BNCreateMetadataSignedIntegerData(kv.second.as<int64_t>());
-        } else if (kv.second.is<double>()) {
-            val = BNCreateMetadataDoubleData(kv.second.as<double>());
+        BNMetadata* child = MetadataFromLua(kv.second, prefer_unsigned);
+        if (!child) {
+            // Skip values we cannot encode rather than aborting the
+            // whole store - matches how the previous codec treated
+            // unrecognised scalars.
+            continue;
         }
-        if (val) {
-            keyStorage.push_back(kv.first.as<std::string>());
-            values.push_back(val);
+        std::string key = kv.first.as<std::string>();
+        bool ok = BNMetadataSetValueForKey(store, key.c_str(), child);
+        BNFreeMetadata(child);
+        if (!ok) {
+            BNFreeMetadata(store);
+            return nullptr;
         }
     }
-
-    BNMetadata* md = nullptr;
-    if (!keyStorage.empty() && keyStorage.size() == values.size()) {
-        std::vector<const char*> keys;
-        keys.reserve(keyStorage.size());
-        for (const auto& k : keyStorage) {
-            keys.push_back(k.c_str());
-        }
-        md = BNCreateMetadataValueStore(keys.data(), values.data(),
-                                        keys.size());
-    }
-
-    for (auto* v : values) {
-        BNFreeMetadata(v);
-    }
-    return md;
+    return store;
 }
 
 void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger) {

@@ -172,6 +172,72 @@ Used on `Symbol.binding`.
 | `global` | `GlobalBinding` |
 | `weak`   | `WeakBinding`   |
 
+## Metadata round-trip
+
+`BinaryView:store_metadata` / `BinaryView:query_metadata` and the
+matching `Function` methods serialize Lua values through Binary
+Ninja's `BNMetadata` type system. Every `BNMetadataType` variant
+that Python supports round-trips cleanly, with a few deliberate
+Lua-flavoured choices worth knowing about.
+
+### Type mapping
+
+| Lua input              | BNMetadataType stored             | Comes back as            |
+|------------------------|-----------------------------------|--------------------------|
+| `true` / `false`       | `BooleanDataType`                 | Lua boolean              |
+| string                 | `StringDataType`                  | Lua string               |
+| integer-valued number  | `SignedIntegerDataType` (default) | Lua integer              |
+| fractional number      | `DoubleDataType`                  | Lua number               |
+| 1-indexed array table  | `ArrayDataType` (recursive)       | 1-indexed array table    |
+| string-keyed table     | `KeyValueDataType` (recursive)    | string-keyed table       |
+
+Arrays and key-value stores are encoded element-by-element
+through `BNMetadataArrayAppend` / `BNMetadataSetValueForKey`, so
+nested tables work without restriction. A key-value store whose
+values include arrays, or an array whose elements are themselves
+nested tables, round-trips to an equivalent Lua structure.
+
+`RawDataType` is decode-only: if some other producer (Python,
+another plugin) stores a raw byte buffer under a metadata key,
+`query_metadata` returns it as a Lua string that preserves
+embedded nulls. There is no encode path for raw - Lua strings
+always round-trip as `StringDataType`, because Lua has no
+distinct binary-blob type. If you need explicit binary metadata,
+create it from Python or C++ and read it back from Lua.
+
+`InvalidDataType` is a sentinel and maps to `nil` on read - it
+should not appear for metadata your scripts wrote, and Python
+raises `TypeError` in the same spot.
+
+### Integer encoding defaults to signed
+
+Lua's `lua_Integer` is signed, so `MetadataFromLua` encodes
+integer-valued numbers as `SignedIntegerDataType` by default.
+This diverges from Python, which defaults unsigned in
+`Metadata.__init__` when the `signed` kwarg is falsy. The
+internal helper accepts a `prefer_unsigned=true` flag that
+forces `BNCreateMetadataUnsignedIntegerData` for non-negative
+values (and recursively for every child of an array or
+key-value table); the Lua-facing `store_metadata` method does
+not currently surface this flag. If you need unsigned encoding
+for a specific key, store it from Python.
+
+On read, `UnsignedIntegerDataType` and `SignedIntegerDataType`
+are both decoded correctly - the signed/unsigned divergence is
+only a concern for values that Python and Lua write into the
+same metadata key and then compare bit-for-bit.
+
+### No automatic JSON fallback
+
+Older versions of `MetadataCodec` fell back to
+`BNMetadataGetJsonString` for any variant the codec did not know
+about. That has been removed: the codec now dispatches on
+`BNMetadataGetType` directly and covers every variant. Unknown
+types return `nil`. If you need Python's explicit
+`Metadata.get_json_string()` escape hatch, it is not currently
+exposed as a Lua method - speak up if that becomes a real
+blocker and it can be wired onto a future `Metadata` usertype.
+
 ## Table of Contents
 
 - [HexAddress](#hexaddress)

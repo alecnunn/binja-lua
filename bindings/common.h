@@ -448,16 +448,31 @@ inline sol::table ReferenceSourcesToTable(
 //
 // MetadataToLua reads a BNMetadata* and returns a Lua-side representation
 // without taking ownership of the metadata object - the caller is still
-// responsible for freeing it.
+// responsible for freeing it. The read side dispatches on
+// BNMetadataGetType and covers every BNMetadataType variant (Boolean,
+// String, Signed/UnsignedInteger, Double, Raw, KeyValue, Array).
+// KeyValue and Array recursively decode their contents. There is no
+// BNMetadataGetJsonString fallback - an unknown BNMetadataType returns
+// nil.
 //
-// MetadataFromLua creates a fresh BNMetadata* from a Lua value. The caller
-// takes ownership and must call BNFreeMetadata on the returned pointer.
-// Supported Lua input types: bool, string, integer, number, an
-// integer-indexed table of strings (stored as a string list), and a
-// string-keyed table of scalars (stored as a key-value store). Unsupported
-// values return nullptr.
+// MetadataFromLua creates a fresh BNMetadata* from a Lua value. The
+// caller takes ownership and must call BNFreeMetadata on the returned
+// pointer. Supported Lua input types:
+//   - bool                        -> BooleanDataType
+//   - string                      -> StringDataType
+//   - number (integer-valued)     -> Signed/UnsignedIntegerDataType
+//   - number (non-integer)        -> DoubleDataType
+//   - 1-indexed sequential table  -> ArrayDataType (recursive)
+//   - string-keyed table          -> KeyValueDataType (recursive)
+// Unsupported values return nullptr. Integer encoding defaults to
+// signed (lua_Integer is signed); pass prefer_unsigned=true to force
+// BNCreateMetadataUnsignedIntegerData for the top-level value and all
+// recursively-encoded children. Lua strings always encode as
+// StringData - there is no encode path for RawDataType since Lua has
+// no distinct binary-blob type. The read path still decodes Raw
+// metadata produced by other writers.
 sol::object MetadataToLua(sol::state_view lua, BNMetadata* md);
-BNMetadata* MetadataFromLua(sol::object value);
+BNMetadata* MetadataFromLua(sol::object value, bool prefer_unsigned = false);
 
 // Extract a uint64_t address from a Lua-side value that may be a
 // HexAddress, integer, or floating-point number. Returns std::nullopt if
