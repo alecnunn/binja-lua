@@ -1,6 +1,7 @@
 // Sol2 bindings common implementation for binja-lua
 
 #include "common.h"
+#include "version.h"
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +25,12 @@ void SetLogger(sol::state_view lua, Ref<Logger> logger) {
 
 void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     if (logger) {
+        // INFO-level plugin load line per docs/versioning.md section
+        // 3.2. Keeps the version visible in the default log stream so
+        // bug reports can cite which build of the plugin was running.
+        logger->LogInfo("binja-lua %.*s loaded",
+            static_cast<int>(kVersionString.size()),
+            kVersionString.data());
         logger->LogDebug("Registering sol2 bindings...");
     }
 
@@ -309,6 +316,18 @@ void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger) {
         BNFreeString(html);
         return result;
     };
+
+    // binjalua namespace table - version source of truth on the Lua
+    // side. See docs/versioning.md section 3.3 for the spelling
+    // rationale. Four-key form: the full version string plus the
+    // three numeric components so scripts can either string-compare
+    // or component-compare without re-parsing. Build-time constant
+    // per section 3.4 (no runtime negotiation).
+    lua["binjalua"] = lua.create_table_with(
+        "version",       std::string(kVersionString),
+        "version_major", kVersionMajor,
+        "version_minor", kVersionMinor,
+        "version_patch", kVersionPatch);
 
     if (logger) logger->LogDebug("Global functions registered");
 }

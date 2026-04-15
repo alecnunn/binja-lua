@@ -3929,6 +3929,64 @@ print("Full type:", t:get_string())
 
 ---
 
+## binjalua
+
+*Plugin-wide namespace table. Populated during
+`RegisterGlobalFunctions` from the version plumbing described in
+[`docs/versioning.md`](versioning.md) section 3. Scripts use this
+table for compatibility gating and introspection.*
+
+### Fields
+
+#### `binjalua.version` -> `string`
+
+Full version string of the currently loaded plugin in the form
+`"MAJOR.MINOR.PATCH"`. Build-time constant baked in by CMake from
+the `project(BinjaLua VERSION ...)` call; never changes after load.
+
+**Example:**
+```lua
+print("binja-lua", binjalua.version)
+```
+
+#### `binjalua.version_major` -> `integer`
+
+Major version component as a Lua integer. During the 0.y.z series
+this stays at 0 until the explicit 1.0.0 graduation; see
+[`docs/versioning.md`](versioning.md) section 1.2 for the
+graduation criteria.
+
+#### `binjalua.version_minor` -> `integer`
+
+Minor version component as a Lua integer. **In the pre-1.0 series
+this is the break marker:** a MINOR bump signals that at least one
+Lua-visible break landed in the release. Scripts that care about
+stability should pin to an exact MINOR.
+
+#### `binjalua.version_patch` -> `integer`
+
+Patch version component as a Lua integer. Additive-only in the
+pre-1.0 series.
+
+### Compatibility gating pattern
+
+```lua
+-- Require binja-lua 0.2.x or newer
+local want_major, want_minor = 0, 2
+if binjalua.version_major < want_major
+   or (binjalua.version_major == want_major
+       and binjalua.version_minor < want_minor) then
+    error("this script needs binja-lua " .. want_major .. "."
+          .. want_minor .. "+, running " .. binjalua.version)
+end
+```
+
+Until 1.0.0 ships, scripts should pin to an exact MINOR because
+MINOR is the break marker in the 0.y.z series. After 1.0.0,
+scripts can pin to MAJOR and treat MINOR as additive-only.
+
+---
+
 ## Magic Variables
 
 These variables are automatically available in the Lua scripting environment:

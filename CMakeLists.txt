@@ -22,7 +22,9 @@
 
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
-project(BinjaLua C CXX)
+project(BinjaLua
+    VERSION 0.2.0
+    LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -147,5 +149,13 @@ add_library(${PROJECT_NAME} SHARED
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${LUA_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC binaryninjaapi ${LUA_LIBRARIES} sol2::sol2)
+
+# Version source-of-truth plumbing. See docs/versioning.md section 3
+# for the policy; bindings/version.h picks these up via preprocessor.
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    BINJALUA_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    BINJALUA_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    BINJALUA_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    BINJALUA_VERSION_STRING="${PROJECT_VERSION}")
 
 bn_install_plugin(${PROJECT_NAME})
