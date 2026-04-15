@@ -99,8 +99,13 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             }
         ),
 
-        // Get highlight color
-        "highlight", sol::property([](sol::this_state ts, FlowGraphNode& node) -> sol::table {
+        // Get highlight color. Bound as a method (colon-call) rather
+        // than a property because sol2 3.3.0 crashes on MSVC when
+        // sol::property is combined with sol::this_state. Same
+        // workaround as tasks #12 / #14 / #15; see task #16 for the
+        // audit that caught this one.
+        "highlight", [](sol::this_state ts, FlowGraphNode& node)
+                          -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
             BNHighlightColor color = node.GetHighlight();
@@ -111,7 +116,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             result["b"] = color.b;
             result["alpha"] = color.alpha;
             return result;
-        }),
+        },
 
         // Get display lines
         "lines", [](sol::this_state ts, FlowGraphNode& node) -> sol::table {

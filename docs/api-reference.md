@@ -44,12 +44,13 @@ longer canonical name. Each removal has a one-line replacement:
 | `Platform.variables` (prop)     | `Platform:variables()` (method)     | `bv.platform.variables`     | `bv.platform:variables()`     |
 | `Platform.functions` (prop)     | `Platform:functions()` (method)     | `bv.platform.functions`     | `bv.platform:functions()`     |
 | `Platform.system_calls` (prop)  | `Platform:system_calls()` (method)  | `bv.platform.system_calls`  | `bv.platform:system_calls()`  |
+| `FlowGraphNode.highlight` (prop)| `FlowGraphNode:highlight()` (method)| `node.highlight`            | `node:highlight()`            |
 
-The Architecture (task #12), CallingConvention (task #14), and
-Platform (task #15) method-form changes are forced by a sol2 3.3.0
-crash on MSVC when `sol::property` is combined with `sol::this_state`.
-The affected accessors were rebound as methods; return value types
-are unchanged.
+The Architecture (task #12), CallingConvention (task #14), Platform
+(task #15), and FlowGraphNode (task #16) method-form changes are
+forced by a sol2 3.3.0 crash on MSVC when `sol::property` is combined
+with `sol::this_state`. The affected accessors were rebound as
+methods; return value types are unchanged.
 
 `Function.arch` now returns an `Architecture` usertype (added in R4)
 instead of the architecture's name string. Existing scripts that used
@@ -3414,11 +3415,15 @@ Height of the node
 
 Associated BasicBlock (if this node represents one)
 
-#### `FlowGraphNode.highlight` -> `table`
-
-Highlight color as {r, g, b, a} (0-255 values)
-
 ### Methods
+
+#### `FlowGraphNode:highlight()` -> `table`
+
+Get the node's highlight color as
+`{style, color, r, g, b, alpha}`. Bound as a method (colon-call)
+rather than a property to work around the sol2 3.3.0
+`sol::property+sol::this_state` MSVC crash shared with tasks
+#12 / #14 / #15.
 
 #### `FlowGraphNode:lines(...)` -> `table<string>`
 
