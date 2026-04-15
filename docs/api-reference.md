@@ -16,6 +16,13 @@ longer canonical name. Each removal has a one-line replacement:
 | `Function["end"]`      | `Function.end_addr`       | `func["end"]`            | `func.end_addr`                 |
 | `Function.auto`        | `Function.auto_discovered`| `if func.auto then`      | `if func.auto_discovered then`  |
 | `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
+| `Function.arch` (string) | `Function.arch.name`    | `print(func.arch)`       | `print(func.arch.name)`         |
+
+`Function.arch` now returns an `Architecture` usertype (added in R4)
+instead of the architecture's name string. Existing scripts that used
+`func.arch` as a string must replace it with `func.arch.name`. The
+underlying object exposes the full read-only Architecture surface
+(registers, flags, decode helpers).
 
 `end_addr` is the single canonical name across every address-range
 usertype. It is spelled out explicitly because `end` is a Lua
@@ -161,6 +168,45 @@ today; listed for completeness).
 | `protected` | `ProtectedAccess` |
 | `public`    | `PublicAccess`    |
 
+### BNEndianness
+
+Used on `Architecture.endianness`.
+
+| Lua     | Python         |
+|---------|----------------|
+| `little`| `LittleEndian` |
+| `big`   | `BigEndian`    |
+
+### BNImplicitRegisterExtend
+
+Used on the `extend` field inside `Architecture.regs` entries.
+
+| Lua    | Python                  |
+|--------|-------------------------|
+| `none` | `NoExtend`              |
+| `zero` | `ZeroExtendToFullWidth` |
+| `sign` | `SignExtendToFullWidth` |
+
+### BNFlagRole
+
+Used on `Architecture.flag_roles` values and as the return value of
+`Architecture:get_flag_role`.
+
+| Lua             | Python                              |
+|-----------------|-------------------------------------|
+| `special`       | `SpecialFlagRole`                   |
+| `zero`          | `ZeroFlagRole`                      |
+| `pos_sign`      | `PositiveSignFlagRole`              |
+| `neg_sign`      | `NegativeSignFlagRole`              |
+| `carry`         | `CarryFlagRole`                     |
+| `overflow`      | `OverflowFlagRole`                  |
+| `half_carry`    | `HalfCarryFlagRole`                 |
+| `even_parity`   | `EvenParityFlagRole`                |
+| `odd_parity`    | `OddParityFlagRole`                 |
+| `ordered`       | `OrderedFlagRole`                   |
+| `unordered`     | `UnorderedFlagRole`                 |
+| `carry_inv_sub` | `CarryFlagWithInvertedSubtractRole` |
+
 ### BNSymbolBinding
 
 Used on `Symbol.binding`.
@@ -244,6 +290,7 @@ blocker and it can be wired onto a future `Metadata` usertype.
 - [Selection](#selection)
 - [Section](#section)
 - [Symbol](#symbol)
+- [Architecture](#architecture)
 - [BinaryView](#binaryview)
 - [Function](#function)
 - [BasicBlock](#basicblock)
@@ -450,6 +497,178 @@ Numeric symbol type value for programmatic comparisons
 -- Use type string instead for readability
 if sym.type == "Function" then ... end
 ```
+
+---
+
+## Architecture
+
+*Read-only view of a Binary Ninja architecture (x86, arm, thumb2, ...).
+Obtained via `func.arch`, `Architecture.get_by_name(name)`, or the
+`branches[i].arch` field returned by `get_instruction_info`. The
+surface mirrors the Python `CoreArchitecture` read shape from
+`binaryninja.architecture`. Write-side, assembly, patching, and
+intrinsics are deliberately not exposed.*
+
+### Properties
+
+#### `Architecture.name` -> `string`
+
+Architecture name (e.g. "x86_64", "aarch64", "thumb2").
+
+#### `Architecture.endianness` -> `string`
+
+`"little"` or `"big"`. See [BNEndianness](#bnendianness).
+
+#### `Architecture.address_size` -> `integer`
+
+Pointer size in bytes.
+
+#### `Architecture.default_int_size` -> `integer`
+
+Default integer width in bytes.
+
+#### `Architecture.instr_alignment` -> `integer`
+
+Minimum instruction alignment in bytes.
+
+#### `Architecture.max_instr_length` -> `integer`
+
+Maximum decode-buffer length. This is the BN plugin's decode buffer
+size, not the CPU's architectural maximum instruction length.
+
+#### `Architecture.opcode_display_length` -> `integer`
+
+Number of opcode bytes displayed per line in disassembly.
+
+#### `Architecture.stack_pointer` -> `string`
+
+Name of the stack pointer register, or the empty string if unset.
+
+#### `Architecture.link_reg` -> `string|nil`
+
+Name of the link register, or `nil` if this architecture has no link
+register. The underlying `0xffffffff` sentinel is translated to `nil`.
+
+#### `Architecture.can_assemble` -> `boolean`
+
+Whether this architecture implements `Assemble`. Read-only query only;
+the `Assemble` method itself is not bound.
+
+#### `Architecture.regs` -> `table<string, RegisterInfo>`
+
+Register catalog keyed by register name. Each value is a table
+`{full_width_reg, size, offset, extend, index}`. `extend` uses the
+short canonical string form from
+[BNImplicitRegisterExtend](#bnimplicitregisterextend).
+
+**Example:**
+```lua
+local arch = Architecture.get_by_name("x86_64")
+print(arch.regs.rax.size, arch.regs.rax.full_width_reg)
+```
+
+#### `Architecture.full_width_regs` -> `table<string>`
+
+Names of full-width registers.
+
+#### `Architecture.global_regs` -> `table<string>`
+
+Names of global registers.
+
+#### `Architecture.system_regs` -> `table<string>`
+
+Names of system registers.
+
+#### `Architecture.flags` -> `table<string>`
+
+Names of all CPU flags.
+
+#### `Architecture.flag_write_types` -> `table<string>`
+
+Names of flag write-type groups. Name list only; the write-type LLIL
+emission surface is not exposed.
+
+#### `Architecture.semantic_flag_classes` -> `table<string>`
+
+Names of semantic flag classes.
+
+#### `Architecture.semantic_flag_groups` -> `table<string>`
+
+Names of semantic flag groups.
+
+#### `Architecture.flag_roles` -> `table<string, string>`
+
+Eager dict mapping flag name to role string. See
+[BNFlagRole](#bnflagrole) for the role vocabulary.
+
+### Methods
+
+#### `Architecture:get_reg_index(name)` -> `integer`
+
+Look up a register index by name.
+
+#### `Architecture:get_reg_name(index)` -> `string`
+
+Look up a register name by index.
+
+#### `Architecture:get_flag_role(flag[, sem_class])` -> `string`
+
+Return the role string of a specific flag. Optionally scoped to a
+semantic flag class index (defaults to 0).
+
+#### `Architecture:get_instruction_info(bytes, addr)` -> `table|nil`
+
+Decode a single instruction's control-flow information without going
+through a populated BinaryView. `bytes` is a Lua string of raw
+instruction bytes (8-bit clean, embedded NULs OK). Returns a table of
+shape:
+
+```
+{ length                           = int,
+  arch_transition_by_target_addr   = bool,
+  branch_delay                     = int,
+  branches = { { type   = string,
+                 target = HexAddress,
+                 arch   = Architecture? }, ... } }
+```
+
+`type` comes from [BNBranchType](#bnbranchtype). `target` is absent
+for unresolved branches; `arch` is only present when the branch
+transitions to a different architecture. Returns `nil` on decode
+failure.
+
+#### `Architecture:get_instruction_text(bytes, addr)` -> `(tokens, length)`
+
+Disassemble a single instruction to its token form. Returns two values:
+a table of instruction text tokens and the decoded instruction length
+in bytes. On decode failure, returns `nil, 0`.
+
+**Example:**
+```lua
+local arch = Architecture.get_by_name("x86_64")
+local bytes = "\x48\x89\xc3"   -- mov rbx, rax
+local tokens, length = arch:get_instruction_text(bytes, 0)
+print(length, #tokens)
+```
+
+#### `Architecture:get_associated_arch_by_address(addr)` -> `(arch, new_addr)`
+
+Return the architecture that applies at a given address together with
+a possibly-adjusted address. Used for ARM/Thumb mode switching.
+
+### Static accessors
+
+#### `Architecture.get_by_name(name)` -> `Architecture|nil`
+
+Look up an architecture by name.
+
+#### `Architecture.list()` -> `table<Architecture>`
+
+Return every registered architecture.
+
+#### `Architecture.contains(name)` -> `boolean`
+
+Shortcut for `Architecture.get_by_name(name) ~= nil`.
 
 ---
 
@@ -1443,13 +1662,16 @@ Display name of the function
 print("Analyzing:", func.name)
 ```
 
-#### `Function.arch` -> `string`
+#### `Function.arch` -> `Architecture`
 
-Architecture name for this function (e.g., "x86_64", "thumb2")
+Architecture usertype for this function. Use `.name` for the string
+name (e.g. "x86_64", "thumb2") and see the Architecture section for
+the full read-only surface (registers, flags, decode helpers).
 
 **Example:**
 ```lua
-print("Architecture:", func.arch)
+print("Architecture:", func.arch.name)
+print("Pointer size:", func.arch.address_size)
 ```
 
 #### `Function.comment` -> `string`

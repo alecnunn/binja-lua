@@ -27,6 +27,7 @@ constexpr const char* DATAVARIABLE_METATABLE = "BinaryNinja.DataVariable";
 constexpr const char* TYPE_METATABLE = "BinaryNinja.Type";
 constexpr const char* FLOWGRAPH_METATABLE = "BinaryNinja.FlowGraph";
 constexpr const char* FLOWGRAPHNODE_METATABLE = "BinaryNinja.FlowGraphNode";
+constexpr const char* ARCHITECTURE_METATABLE = "BinaryNinja.Architecture";
 
 // Logger key for storing in Lua registry
 constexpr const char* LOGGER_REGISTRY_KEY = "__binja_logger";
@@ -62,6 +63,7 @@ void RegisterDataVariableBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterTagBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger);
+void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger);
 
 // Load optional Lua API extensions (lua-api/*.lua)
@@ -241,6 +243,41 @@ inline const char* EnumToString(BNMemberAccess access) {
     return "unknown";
 }
 
+inline const char* EnumToString(BNEndianness endianness) {
+    switch (endianness) {
+        case LittleEndian: return "little";
+        case BigEndian:    return "big";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNImplicitRegisterExtend extend) {
+    switch (extend) {
+        case NoExtend:              return "none";
+        case ZeroExtendToFullWidth: return "zero";
+        case SignExtendToFullWidth: return "sign";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNFlagRole role) {
+    switch (role) {
+        case SpecialFlagRole:                   return "special";
+        case ZeroFlagRole:                      return "zero";
+        case PositiveSignFlagRole:              return "pos_sign";
+        case NegativeSignFlagRole:              return "neg_sign";
+        case CarryFlagRole:                     return "carry";
+        case OverflowFlagRole:                  return "overflow";
+        case HalfCarryFlagRole:                 return "half_carry";
+        case EvenParityFlagRole:                return "even_parity";
+        case OddParityFlagRole:                 return "odd_parity";
+        case OrderedFlagRole:                   return "ordered";
+        case UnorderedFlagRole:                 return "unordered";
+        case CarryFlagWithInvertedSubtractRole: return "carry_inv_sub";
+    }
+    return "unknown";
+}
+
 inline const char* EnumToString(BNSymbolBinding binding) {
     switch (binding) {
         case NoBinding:     return "none";
@@ -402,6 +439,50 @@ inline std::optional<BNMemberAccess> EnumFromString<BNMemberAccess>(
     if (s == "private" || s == "PrivateAccess") return PrivateAccess;
     if (s == "protected" || s == "ProtectedAccess") return ProtectedAccess;
     if (s == "public" || s == "PublicAccess") return PublicAccess;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNEndianness> EnumFromString<BNEndianness>(
+    const std::string& s) {
+    if (s == "little" || s == "LittleEndian") return LittleEndian;
+    if (s == "big" || s == "BigEndian") return BigEndian;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNImplicitRegisterExtend>
+EnumFromString<BNImplicitRegisterExtend>(const std::string& s) {
+    if (s == "none" || s == "NoExtend") return NoExtend;
+    if (s == "zero" || s == "ZeroExtendToFullWidth")
+        return ZeroExtendToFullWidth;
+    if (s == "sign" || s == "SignExtendToFullWidth")
+        return SignExtendToFullWidth;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNFlagRole> EnumFromString<BNFlagRole>(
+    const std::string& s) {
+    if (s == "special" || s == "SpecialFlagRole") return SpecialFlagRole;
+    if (s == "zero" || s == "ZeroFlagRole") return ZeroFlagRole;
+    if (s == "pos_sign" || s == "PositiveSignFlagRole")
+        return PositiveSignFlagRole;
+    if (s == "neg_sign" || s == "NegativeSignFlagRole")
+        return NegativeSignFlagRole;
+    if (s == "carry" || s == "CarryFlagRole") return CarryFlagRole;
+    if (s == "overflow" || s == "OverflowFlagRole") return OverflowFlagRole;
+    if (s == "half_carry" || s == "HalfCarryFlagRole")
+        return HalfCarryFlagRole;
+    if (s == "even_parity" || s == "EvenParityFlagRole")
+        return EvenParityFlagRole;
+    if (s == "odd_parity" || s == "OddParityFlagRole")
+        return OddParityFlagRole;
+    if (s == "ordered" || s == "OrderedFlagRole") return OrderedFlagRole;
+    if (s == "unordered" || s == "UnorderedFlagRole")
+        return UnorderedFlagRole;
+    if (s == "carry_inv_sub" || s == "CarryFlagWithInvertedSubtractRole")
+        return CarryFlagWithInvertedSubtractRole;
     return std::nullopt;
 }
 

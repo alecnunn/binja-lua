@@ -43,6 +43,11 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     RegisterSymbolBindings(lua, logger);
     RegisterBasicBlockBindings(lua, logger);
 
+    // 2a. Architecture / CallingConvention / Platform stack.
+    // Must come before Function so Function.arch can return a
+    // Ref<Architecture> usertype rather than a raw refcount handle.
+    RegisterArchitectureBindings(lua, logger);
+
     // 3. Wrapper types that may reference core types
     RegisterInstructionBindings(lua, logger);
     RegisterVariableBindings(lua, logger);

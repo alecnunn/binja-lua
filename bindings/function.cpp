@@ -30,9 +30,8 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             return sym ? sym->GetShortName() : "<unnamed>";
         }),
 
-        "arch", sol::property([](Function& f) -> std::string {
-            Ref<Architecture> arch = f.GetArchitecture();
-            return arch ? arch->GetName() : "<unknown>";
+        "arch", sol::property([](Function& f) -> Ref<Architecture> {
+            return f.GetArchitecture();
         }),
 
         "comment", sol::property([](Function& f) -> std::string {

@@ -121,6 +121,7 @@ add_subdirectory(${BN_API_PATH} api)
 # Binding sources (sol2-based)
 set(BINDING_SOURCES
     bindings/common.cpp
+    bindings/architecture.cpp
     bindings/basicblock.cpp
     bindings/binaryview.cpp
     bindings/function.cpp
