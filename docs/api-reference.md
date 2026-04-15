@@ -276,6 +276,17 @@ Used on the `ref_type` field of entries returned by
 | `indirect` | `IndirectTypeReferenceType`   |
 | `unknown`  | `UnknownTypeReferenceType`    |
 
+### BNTagTypeType
+
+Used on `TagType.type`. Note that the enum is named `BNTagTypeType`
+(not `BNTagType`, which is the opaque BN core handle type).
+
+| Lua            | Python                |
+|----------------|-----------------------|
+| `user`         | `UserTagType`         |
+| `notification` | `NotificationTagType` |
+| `bookmarks`    | `BookmarksTagType`    |
+
 ## Metadata round-trip
 
 `BinaryView:store_metadata` / `BinaryView:query_metadata` and the
@@ -564,6 +575,39 @@ Numeric symbol type value for programmatic comparisons
 ```lua
 -- Use type string instead for readability
 if sym.type == "Function" then ... end
+```
+
+### Constructors
+
+#### `Symbol.new(sym_type, addr, short_name[, full_name[, raw_name[, binding[, ordinal]]]])` -> `Symbol`
+
+Construct a new Symbol for use with
+`BinaryView:define_user_symbol` / `define_auto_symbol`. The shape
+mirrors Python's `binaryninja.types.Symbol.__init__`.
+
+**Parameters:**
+- `sym_type` (string) - Any value from [BNSymbolType](#bnsymboltype)
+  (short canonical form like `"Function"` or Python-verbatim form
+  like `"FunctionSymbol"`).
+- `addr` (HexAddress|integer) - Address the symbol refers to.
+- `short_name` (string) - Primary display name.
+- `full_name` (string, optional) - Full qualified name. Defaults to
+  `short_name`.
+- `raw_name` (string, optional) - Mangled / raw name. Defaults to
+  `full_name`.
+- `binding` (string, optional) - Any value from
+  [BNSymbolBinding](#bnsymbolbinding). Defaults to `"none"`.
+- `ordinal` (integer, optional) - Export ordinal. Defaults to `0`.
+
+Returns `nil` if `sym_type` is unrecognised or `addr` cannot be
+coerced. Namespace selection is intentionally not exposed here
+because the `NameSpace` usertype is not bound; symbols constructed
+via this factory always land in the default internal namespace.
+
+**Example:**
+```lua
+local sym = Symbol.new("Function", 0x401000, "decrypt_buffer")
+bv:define_user_symbol(sym)
 ```
 
 ---
@@ -1574,6 +1618,14 @@ Get a tag type by its name
 **Parameters:**
 - `name` (string) - Name of the tag type to look up
 
+#### `BinaryView:get_tag_type_by_id(...)` -> `TagType|nil`
+
+Get a tag type by its unique ID string. Useful for persistent tag
+references that survive a rename.
+
+**Parameters:**
+- `id` (string) - Unique ID of the tag type
+
 #### `BinaryView:create_tag_type(...)` -> `TagType`
 
 Create a new tag type for annotating the binary
@@ -1630,7 +1682,7 @@ Remove a tag from an address
 
 #### `BinaryView:create_user_tag(...)` -> `Tag|nil`
 
-Create and add a new tag at an address in one step
+Create and add a new user tag at an address in one step
 
 **Parameters:**
 - `addr` (HexAddress|integer) - Address to create tag at
@@ -1640,6 +1692,23 @@ Create and add a new tag at an address in one step
 **Example:**
 ```lua
 bv:create_user_tag(here, "Vulnerability", "Buffer overflow in memcpy")
+```
+
+#### `BinaryView:create_auto_tag(...)` -> `Tag|nil`
+
+Create and add a new auto (analysis-generated) tag at an address
+in one step. Use this for tags produced by script-driven analysis
+passes; use `create_user_tag` for tags the user should see as
+hand-authored.
+
+**Parameters:**
+- `addr` (HexAddress|integer) - Address to create tag at
+- `tagTypeName` (string) - Name of the tag type (must already exist)
+- `data` (string) - Tag data/description
+
+**Example:**
+```lua
+bv:create_auto_tag(here, "Analysis", "Matched memset pattern")
 ```
 
 #### `BinaryView:get_all_tags(...)` -> `table<{addr: HexAddress, tag: Tag, auto: boolean, func: Function|nil}>`

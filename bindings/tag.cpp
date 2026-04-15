@@ -28,13 +28,12 @@ void RegisterTagBindings(sol::state_view lua, Ref<Logger> logger) {
             return tt.GetVisible();
         }),
 
+        // R7 retrofit: route through the shared R2 EnumToString helper
+        // (BNTagTypeType - note TagType::Type is a typedef for that
+        // enum, not for TagType itself). Lua-visible strings are
+        // unchanged.
         "type", sol::property([](TagType& tt) -> std::string {
-            switch (tt.GetType()) {
-                case UserTagType: return "user";
-                case NotificationTagType: return "notification";
-                case BookmarksTagType: return "bookmarks";
-                default: return "unknown";
-            }
+            return EnumToString(tt.GetType());
         }),
 
         // Setters

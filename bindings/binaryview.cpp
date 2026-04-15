@@ -540,6 +540,11 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return bv.GetTagType(name);
         },
 
+        "get_tag_type_by_id", [](BinaryView& bv, const std::string& id)
+            -> Ref<TagType> {
+            return bv.GetTagTypeById(id);
+        },
+
         "create_tag_type", [](BinaryView& bv, const std::string& name,
                               const std::string& icon) -> Ref<TagType> {
             Ref<TagType> tagType = new TagType(&bv, name, icon);
@@ -596,6 +601,16 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             auto addr = AsAddress(addr_obj);
             if (!addr) return nullptr;
             return bv.CreateUserDataTag(*addr, tagTypeName, data);
+        },
+
+        "create_auto_tag", [](BinaryView& bv, sol::object addr_obj,
+                               const std::string& tagTypeName,
+                               const std::string& data) -> Ref<Tag> {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return nullptr;
+            Ref<TagType> tagType = bv.GetTagType(tagTypeName);
+            if (!tagType) return nullptr;
+            return bv.CreateAutoDataTag(*addr, tagType, data);
         },
 
         // Get all tags

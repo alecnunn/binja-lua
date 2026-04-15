@@ -317,6 +317,19 @@ inline const char* EnumToString(BNTypeReferenceType ref) {
     return "unknown";
 }
 
+// Note: the C++ TagType::Type typedef and BN core's BNTagTypeType are
+// the same enum; TagType::GetType() returns BNTagTypeType. The R7
+// retrofit moves the previously hand-rolled switch in tag.cpp onto
+// this helper.
+inline const char* EnumToString(BNTagTypeType type) {
+    switch (type) {
+        case UserTagType:         return "user";
+        case NotificationTagType: return "notification";
+        case BookmarksTagType:    return "bookmarks";
+    }
+    return "unknown";
+}
+
 // Dual-accept reverse lookup for every enum that has an EnumToString
 // helper. Each specialization accepts BOTH the short canonical Lua
 // string produced by EnumToString (e.g. "unconditional", "Function",
@@ -546,6 +559,17 @@ EnumFromString<BNTypeReferenceType>(const std::string& s) {
         return ::IndirectTypeReferenceType;
     if (s == "unknown" || s == "UnknownTypeReferenceType")
         return ::UnknownTypeReferenceType;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNTagTypeType> EnumFromString<BNTagTypeType>(
+    const std::string& s) {
+    if (s == "user" || s == "UserTagType") return UserTagType;
+    if (s == "notification" || s == "NotificationTagType")
+        return NotificationTagType;
+    if (s == "bookmarks" || s == "BookmarksTagType")
+        return BookmarksTagType;
     return std::nullopt;
 }
 
