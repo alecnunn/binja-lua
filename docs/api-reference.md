@@ -2,6 +2,26 @@
 
 *Generated from API definitions*
 
+## Migration from pre-R3d property names
+
+R3d removed several short-form property aliases that duplicated a
+longer canonical name. Each removal has a one-line replacement:
+
+| Removed                | Canonical replacement     | Before                   | After                           |
+|------------------------|---------------------------|--------------------------|---------------------------------|
+| `BinaryView.start`     | `BinaryView.start_addr`   | `bv.start`               | `bv.start_addr`                 |
+| `BinaryView["end"]`    | `BinaryView.end_addr`     | `bv["end"]`              | `bv.end_addr`                   |
+| `BinaryView.file`      | `BinaryView.filename`     | `bv.file`                | `bv.filename`                   |
+| `Function.start`       | `Function.start_addr`     | `func.start`             | `func.start_addr`               |
+| `Function["end"]`      | `Function.end_addr`       | `func["end"]`            | `func.end_addr`                 |
+| `Function.auto`        | `Function.auto_discovered`| `if func.auto then`      | `if func.auto_discovered then`  |
+| `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
+
+`end_addr` is the single canonical name across every address-range
+usertype. It is spelled out explicitly because `end` is a Lua
+reserved keyword and had to be accessed as `obj["end"]` anyway; the
+bracket form is no longer supported.
+
 ## Table of Contents
 
 - [HexAddress](#hexaddress)
@@ -228,31 +248,19 @@ if sym.type == "Function" then ... end
 
 Starting address of the binary view's address space
 
-**Aliases:** `start`
-
 **Example:**
 ```lua
 print(bv.start_addr)  -- e.g., 0x140000000
 ```
 
-#### `BinaryView.start` -> `HexAddress`
-
-Alias for start_addr
-
 #### `BinaryView.end_addr` -> `HexAddress`
 
 End address of the binary view (one past the last valid address)
-
-**Aliases:** `end`
 
 **Example:**
 ```lua
 print(bv.end_addr)
 ```
-
-#### `BinaryView.end` -> `HexAddress`
-
-Alias for end_addr (note: use bv["end"] since 'end' is a Lua keyword)
 
 #### `BinaryView.length` -> `integer`
 
@@ -263,20 +271,14 @@ Total size of the binary in bytes
 print('Size:', bv.length, 'bytes')
 ```
 
-#### `BinaryView.file` -> `string`
+#### `BinaryView.filename` -> `string`
 
 Full path to the loaded binary file
 
-**Aliases:** `filename`
-
 **Example:**
 ```lua
-print('File:', bv.file)
+print('File:', bv.filename)
 ```
-
-#### `BinaryView.filename` -> `string`
-
-Alias for file property
 
 #### `BinaryView.arch` -> `string`
 
@@ -685,7 +687,7 @@ Get all code references TO the given address (who calls/jumps here?)
 
 **Example:**
 ```lua
-local refs = bv:get_code_refs(func.start.value)
+local refs = bv:get_code_refs(func.start_addr.value)
 print("Function is called from", #refs, "locations:")
 for _, ref in ipairs(refs) do
     print("  ", ref.addr, ref.func and ref.func.name or "")
@@ -737,7 +739,7 @@ Get all call sites that call the function at the given address
 
 **Example:**
 ```lua
-local callers = bv:get_callers(func.start.value)
+local callers = bv:get_callers(func.start_addr.value)
 print("Called from", #callers, "locations:")
 for _, caller in ipairs(callers) do
     print("  ", caller.address, caller.func and caller.func.name or "")
@@ -891,7 +893,7 @@ Get all tags within a specified address range
 
 **Example:**
 ```lua
-local tags = bv:get_tags_in_range(func.start, func["end"])
+local tags = bv:get_tags_in_range(func.start_addr, func.end_addr)
 for _, entry in ipairs(tags) do
     print(entry.addr, entry.tag.type.name, entry.tag.data)
 end
@@ -1193,26 +1195,19 @@ end
 
 Start address of the function
 
-**Aliases:** `start`
-
-#### `Function.start` -> `HexAddress`
-
-Start address of the function (preferred name)
-
 **Example:**
 ```lua
-print("Function starts at:", func.start)
+print("Function starts at:", func.start_addr)
 ```
 
 #### `Function.end_addr` -> `HexAddress`
 
 End address of the function (highest address in function)
 
-**Aliases:** `end, highest_addr`
-
-#### `Function.end` -> `HexAddress`
-
-End address of the function (use func["end"] since 'end' is a Lua keyword)
+**Example:**
+```lua
+print("Function ends at:", func.end_addr)
+```
 
 #### `Function.size` -> `integer`
 
@@ -1270,7 +1265,7 @@ BinaryView containing this function
 **Example:**
 ```lua
 local bv = func.view
-print("From file:", bv.file)
+print("From file:", bv.filename)
 ```
 
 #### `Function.auto_discovered` -> `boolean`
@@ -1322,15 +1317,6 @@ Whether the function can return normally (false for noreturn functions)
 if not func.can_return then
     print("This is a noreturn function")
 end
-```
-
-#### `Function.auto` -> `boolean`
-
-Whether this function was auto-discovered during analysis (same as auto_discovered)
-
-**Example:**
-```lua
-if func.auto then print("Auto-discovered function") end
 ```
 
 #### `Function.is_exported` -> `boolean`
@@ -1762,7 +1748,7 @@ Get the stack frame layout
 **Example:**
 ```lua
 for _, var in ipairs(func:stack_layout()) do
-    print(string.format("[%+d] %s: %s", var.offset, var.name, var.type))
+    print(string.format("[%+d] %s: %s", var.offset, var.name, var.type_name))
 end
 ```
 
@@ -2250,20 +2236,14 @@ Name of the variable
 print("Variable:", var.name)
 ```
 
-#### `Variable.type` -> `string`
+#### `Variable.type_name` -> `string`
 
 Type name of the variable (e.g., "int", "char*")
 
-**Aliases:** `type_name`
-
 **Example:**
 ```lua
-print(var.name, ":", var.type)
+print(var.name, ":", var.type_name)
 ```
-
-#### `Variable.type_name` -> `string`
-
-Alias for type property
 
 #### `Variable.index` -> `integer`
 

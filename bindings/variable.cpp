@@ -91,11 +91,6 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger) {
             return v.GetName();
         }),
 
-        "type", sol::property([](const VariableWrapper& v) -> std::string {
-            return v.GetTypeName();
-        }),
-
-        // Alias for type (commonly used)
         "type_name", sol::property([](const VariableWrapper& v) -> std::string {
             return v.GetTypeName();
         }),

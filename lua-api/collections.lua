@@ -458,7 +458,7 @@ local function extend_function()
     @return function Iterator function that yields Variable objects
     @example
     for var in func:each_variable() do
-        print(var.name, var.type)
+        print(var.name, var.type_name)
     end
     ]]
     func_mt.__index.each_variable = function(self)

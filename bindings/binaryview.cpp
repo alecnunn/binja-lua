@@ -15,16 +15,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "start_addr", sol::property([](BinaryView& bv) -> HexAddress {
             return HexAddress(bv.GetStart());
         }),
-        // Alias for start_addr
-        "start", sol::property([](BinaryView& bv) -> HexAddress {
-            return HexAddress(bv.GetStart());
-        }),
 
         "end_addr", sol::property([](BinaryView& bv) -> HexAddress {
-            return HexAddress(bv.GetEnd());
-        }),
-        // Alias for end_addr (note: "end" is a Lua keyword, use bv["end"])
-        "end", sol::property([](BinaryView& bv) -> HexAddress {
             return HexAddress(bv.GetEnd());
         }),
 
@@ -32,11 +24,6 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return bv.GetLength();
         }),
 
-        "file", sol::property([](BinaryView& bv) -> std::string {
-            Ref<FileMetadata> file = bv.GetFile();
-            return file ? file->GetFilename() : "<unknown>";
-        }),
-        // Alias for file
         "filename", sol::property([](BinaryView& bv) -> std::string {
             Ref<FileMetadata> file = bv.GetFile();
             return file ? file->GetFilename() : "<unknown>";

@@ -16,16 +16,8 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         "start_addr", sol::property([](Function& f) -> HexAddress {
             return HexAddress(f.GetStart());
         }),
-        // Alias for start_addr
-        "start", sol::property([](Function& f) -> HexAddress {
-            return HexAddress(f.GetStart());
-        }),
 
         "end_addr", sol::property([](Function& f) -> HexAddress {
-            return HexAddress(f.GetHighestAddress());
-        }),
-        // Alias for end_addr
-        "end", sol::property([](Function& f) -> HexAddress {
             return HexAddress(f.GetHighestAddress());
         }),
 
@@ -100,11 +92,6 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "can_return", sol::property([](Function& f) -> bool {
             return f.CanReturn().GetValue();
-        }),
-
-        // Alias for auto_discovered for Python API compatibility
-        "auto", sol::property([](Function& f) -> bool {
-            return f.WasAutomaticallyDiscovered();
         }),
 
         // is_exported: true if function symbol has global or weak binding
