@@ -124,6 +124,7 @@ set(BINDING_SOURCES
     bindings/architecture.cpp
     bindings/basicblock.cpp
     bindings/binaryview.cpp
+    bindings/callingconvention.cpp
     bindings/function.cpp
     bindings/instruction.cpp
     bindings/variable.cpp

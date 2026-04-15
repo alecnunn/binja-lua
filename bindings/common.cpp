@@ -47,6 +47,7 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     // Must come before Function so Function.arch can return a
     // Ref<Architecture> usertype rather than a raw refcount handle.
     RegisterArchitectureBindings(lua, logger);
+    RegisterCallingConventionBindings(lua, logger);
 
     // 3. Wrapper types that may reference core types
     RegisterInstructionBindings(lua, logger);

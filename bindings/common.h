@@ -28,6 +28,8 @@ constexpr const char* TYPE_METATABLE = "BinaryNinja.Type";
 constexpr const char* FLOWGRAPH_METATABLE = "BinaryNinja.FlowGraph";
 constexpr const char* FLOWGRAPHNODE_METATABLE = "BinaryNinja.FlowGraphNode";
 constexpr const char* ARCHITECTURE_METATABLE = "BinaryNinja.Architecture";
+constexpr const char* CALLINGCONVENTION_METATABLE =
+    "BinaryNinja.CallingConvention";
 
 // Logger key for storing in Lua registry
 constexpr const char* LOGGER_REGISTRY_KEY = "__binja_logger";
@@ -64,6 +66,8 @@ void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterTagBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger);
+void RegisterCallingConventionBindings(sol::state_view lua,
+                                        Ref<Logger> logger);
 void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger);
 
 // Load optional Lua API extensions (lua-api/*.lua)

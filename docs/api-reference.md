@@ -291,6 +291,7 @@ blocker and it can be wired onto a future `Metadata` usertype.
 - [Section](#section)
 - [Symbol](#symbol)
 - [Architecture](#architecture)
+- [CallingConvention](#callingconvention)
 - [BinaryView](#binaryview)
 - [Function](#function)
 - [BasicBlock](#basicblock)
@@ -669,6 +670,100 @@ Return every registered architecture.
 #### `Architecture.contains(name)` -> `boolean`
 
 Shortcut for `Architecture.get_by_name(name) ~= nil`.
+
+---
+
+## CallingConvention
+
+*Read-only view of a Binary Ninja calling convention. Obtained via
+`func.calling_convention`. The surface mirrors the Python
+`CallingConvention` handle-initialised shape from
+`binaryninja.callingconvention`. The `confidence` / `with_confidence`
+Python-layer machinery is intentionally not exposed - the underlying
+C++ API has no confidence field on the calling convention itself, and
+only `Confidence<Ref<CallingConvention>>` wrapped by callers like
+Function actually carries that number.*
+
+### Properties
+
+#### `CallingConvention.name` -> `string`
+
+Calling convention name (e.g. `"cdecl"`, `"sysv"`, `"win64"`).
+
+#### `CallingConvention.arch` -> `Architecture`
+
+Architecture this calling convention is bound to.
+
+#### `CallingConvention.caller_saved_regs` -> `table<string>`
+
+Names of caller-saved registers.
+
+#### `CallingConvention.callee_saved_regs` -> `table<string>`
+
+Names of callee-saved registers.
+
+#### `CallingConvention.int_arg_regs` -> `table<string>`
+
+Integer argument registers in order.
+
+#### `CallingConvention.float_arg_regs` -> `table<string>`
+
+Floating-point argument registers in order.
+
+#### `CallingConvention.required_arg_regs` -> `table<string>`
+
+Registers that must be arguments for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention.required_clobbered_regs` -> `table<string>`
+
+Registers that must be clobbered for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention.implicitly_defined_regs` -> `table<string>`
+
+Registers implicitly defined on entry.
+
+#### `CallingConvention.int_return_reg` -> `string|nil`
+
+Integer return value register, or `nil` if unset. The underlying
+`0xffffffff` sentinel is translated to `nil`.
+
+#### `CallingConvention.high_int_return_reg` -> `string|nil`
+
+High-half integer return value register, or `nil` if unset.
+
+#### `CallingConvention.float_return_reg` -> `string|nil`
+
+Floating-point return value register, or `nil` if unset.
+
+#### `CallingConvention.global_pointer_reg` -> `string|nil`
+
+Global pointer register, or `nil` if unset.
+
+#### `CallingConvention.arg_regs_share_index` -> `boolean`
+
+Whether integer and float argument registers share the same index
+slot (e.g. both are consumed in one step).
+
+#### `CallingConvention.arg_regs_for_varargs` -> `boolean`
+
+Whether argument registers are also used for variadic arguments.
+
+#### `CallingConvention.stack_reserved_for_arg_regs` -> `boolean`
+
+Whether stack space is reserved even for arguments passed in
+registers.
+
+#### `CallingConvention.stack_adjusted_on_return` -> `boolean`
+
+Whether the stack pointer is adjusted by the callee on return
+(callee cleanup).
+
+#### `CallingConvention.eligible_for_heuristics` -> `boolean`
+
+Whether this calling convention is considered by the heuristic
+analysis that guesses a function's calling convention.
 
 ---
 
@@ -1672,6 +1767,21 @@ the full read-only surface (registers, flags, decode helpers).
 ```lua
 print("Architecture:", func.arch.name)
 print("Pointer size:", func.arch.address_size)
+```
+
+#### `Function.calling_convention` -> `CallingConvention|nil`
+
+Calling convention currently associated with the function, or `nil`
+if unset. See the CallingConvention section for the read-only
+surface.
+
+**Example:**
+```lua
+local cc = func.calling_convention
+if cc then
+    print(cc.name, "on", cc.arch.name,
+          "int args:", #cc.int_arg_regs)
+end
 ```
 
 #### `Function.comment` -> `string`
