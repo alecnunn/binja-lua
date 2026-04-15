@@ -28,11 +28,22 @@ longer canonical name. Each removal has a one-line replacement:
 | `Architecture.semantic_flag_classes` (prop)| `Architecture:semantic_flag_classes()` (method)| `arch.semantic_flag_classes`| `arch:semantic_flag_classes()`|
 | `Architecture.semantic_flag_groups` (prop) | `Architecture:semantic_flag_groups()` (method) | `arch.semantic_flag_groups` | `arch:semantic_flag_groups()` |
 | `Architecture.flag_roles` (prop)    | `Architecture:flag_roles()` (method)    | `arch.flag_roles.z`          | `arch:flag_roles().z`          |
+| `CallingConvention.caller_saved_regs` (prop)     | `CallingConvention:caller_saved_regs()` (method)     | `cc.caller_saved_regs`     | `cc:caller_saved_regs()`     |
+| `CallingConvention.callee_saved_regs` (prop)     | `CallingConvention:callee_saved_regs()` (method)     | `cc.callee_saved_regs`     | `cc:callee_saved_regs()`     |
+| `CallingConvention.int_arg_regs` (prop)          | `CallingConvention:int_arg_regs()` (method)          | `cc.int_arg_regs`          | `cc:int_arg_regs()`          |
+| `CallingConvention.float_arg_regs` (prop)        | `CallingConvention:float_arg_regs()` (method)        | `cc.float_arg_regs`        | `cc:float_arg_regs()`        |
+| `CallingConvention.required_arg_regs` (prop)     | `CallingConvention:required_arg_regs()` (method)     | `cc.required_arg_regs`     | `cc:required_arg_regs()`     |
+| `CallingConvention.required_clobbered_regs` (prop)| `CallingConvention:required_clobbered_regs()` (method)| `cc.required_clobbered_regs`| `cc:required_clobbered_regs()`|
+| `CallingConvention.implicitly_defined_regs` (prop)| `CallingConvention:implicitly_defined_regs()` (method)| `cc.implicitly_defined_regs`| `cc:implicitly_defined_regs()`|
+| `CallingConvention.int_return_reg` (prop)        | `CallingConvention:int_return_reg()` (method)        | `cc.int_return_reg`        | `cc:int_return_reg()`        |
+| `CallingConvention.high_int_return_reg` (prop)   | `CallingConvention:high_int_return_reg()` (method)   | `cc.high_int_return_reg`   | `cc:high_int_return_reg()`   |
+| `CallingConvention.float_return_reg` (prop)      | `CallingConvention:float_return_reg()` (method)      | `cc.float_return_reg`      | `cc:float_return_reg()`      |
+| `CallingConvention.global_pointer_reg` (prop)    | `CallingConvention:global_pointer_reg()` (method)    | `cc.global_pointer_reg`    | `cc:global_pointer_reg()`    |
 
-The Architecture method-form changes (task #12) are forced by a sol2
-3.3.0 crash on MSVC when `sol::property` is combined with
-`sol::this_state`. The affected accessors were rebound as methods;
-return value types are unchanged.
+The Architecture (task #12) and CallingConvention (task #14)
+method-form changes are forced by a sol2 3.3.0 crash on MSVC when
+`sol::property` is combined with `sol::this_state`. The affected
+accessors were rebound as methods; return value types are unchanged.
 
 `Function.arch` now returns an `Architecture` usertype (added in R4)
 instead of the architecture's name string. Existing scripts that used
@@ -725,53 +736,6 @@ Calling convention name (e.g. `"cdecl"`, `"sysv"`, `"win64"`).
 
 Architecture this calling convention is bound to.
 
-#### `CallingConvention.caller_saved_regs` -> `table<string>`
-
-Names of caller-saved registers.
-
-#### `CallingConvention.callee_saved_regs` -> `table<string>`
-
-Names of callee-saved registers.
-
-#### `CallingConvention.int_arg_regs` -> `table<string>`
-
-Integer argument registers in order.
-
-#### `CallingConvention.float_arg_regs` -> `table<string>`
-
-Floating-point argument registers in order.
-
-#### `CallingConvention.required_arg_regs` -> `table<string>`
-
-Registers that must be arguments for heuristic matching to pick this
-calling convention.
-
-#### `CallingConvention.required_clobbered_regs` -> `table<string>`
-
-Registers that must be clobbered for heuristic matching to pick this
-calling convention.
-
-#### `CallingConvention.implicitly_defined_regs` -> `table<string>`
-
-Registers implicitly defined on entry.
-
-#### `CallingConvention.int_return_reg` -> `string|nil`
-
-Integer return value register, or `nil` if unset. The underlying
-`0xffffffff` sentinel is translated to `nil`.
-
-#### `CallingConvention.high_int_return_reg` -> `string|nil`
-
-High-half integer return value register, or `nil` if unset.
-
-#### `CallingConvention.float_return_reg` -> `string|nil`
-
-Floating-point return value register, or `nil` if unset.
-
-#### `CallingConvention.global_pointer_reg` -> `string|nil`
-
-Global pointer register, or `nil` if unset.
-
 #### `CallingConvention.arg_regs_share_index` -> `boolean`
 
 Whether integer and float argument registers share the same index
@@ -795,6 +759,64 @@ Whether the stack pointer is adjusted by the callee on return
 
 Whether this calling convention is considered by the heuristic
 analysis that guesses a function's calling convention.
+
+### Methods
+
+The register set and single-register accessors are bound as methods
+(colon-call) rather than properties. sol2 3.3.0 on MSVC crashes when
+`sol::property` is combined with `sol::this_state` (the handle
+required to build the Lua-side name table / nil-passthrough return),
+so every accessor that needs the Lua state takes the method form.
+See the migration table at the top of this document for the
+before/after mapping. Return types are unchanged from the original
+property-form draft.
+
+#### `CallingConvention:caller_saved_regs()` -> `table<string>`
+
+Names of caller-saved registers.
+
+#### `CallingConvention:callee_saved_regs()` -> `table<string>`
+
+Names of callee-saved registers.
+
+#### `CallingConvention:int_arg_regs()` -> `table<string>`
+
+Integer argument registers in order.
+
+#### `CallingConvention:float_arg_regs()` -> `table<string>`
+
+Floating-point argument registers in order.
+
+#### `CallingConvention:required_arg_regs()` -> `table<string>`
+
+Registers that must be arguments for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention:required_clobbered_regs()` -> `table<string>`
+
+Registers that must be clobbered for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention:implicitly_defined_regs()` -> `table<string>`
+
+Registers implicitly defined on entry.
+
+#### `CallingConvention:int_return_reg()` -> `string|nil`
+
+Integer return value register, or `nil` if unset. The underlying
+`0xffffffff` sentinel is translated to `nil`.
+
+#### `CallingConvention:high_int_return_reg()` -> `string|nil`
+
+High-half integer return value register, or `nil` if unset.
+
+#### `CallingConvention:float_return_reg()` -> `string|nil`
+
+Floating-point return value register, or `nil` if unset.
+
+#### `CallingConvention:global_pointer_reg()` -> `string|nil`
+
+Global pointer register, or `nil` if unset.
 
 ---
 

@@ -83,89 +83,83 @@ void RegisterCallingConventionBindings(sol::state_view lua,
             return cc.GetArchitecture();
         }),
 
-        // Register sets (arrays of name strings)
+        // Register sets (arrays of name strings). Bound as methods
+        // (colon-call on the Lua side) instead of sol::property because
+        // sol2 3.3.0 crashes on MSVC when sol::property is combined
+        // with sol::this_state; see task #12 for the architecture.cpp
+        // repro and task #14 for the same fix here.
 
-        "caller_saved_regs", sol::property([](sol::this_state ts,
-                                               CallingConvention& cc)
-                                               -> sol::table {
+        "caller_saved_regs", [](sol::this_state ts, CallingConvention& cc)
+                                  -> sol::table {
             return RegIndicesToNameTable(sol::state_view(ts), cc,
                                          cc.GetCallerSavedRegisters());
-        }),
+        },
 
-        "callee_saved_regs", sol::property([](sol::this_state ts,
-                                               CallingConvention& cc)
-                                               -> sol::table {
+        "callee_saved_regs", [](sol::this_state ts, CallingConvention& cc)
+                                  -> sol::table {
             return RegIndicesToNameTable(sol::state_view(ts), cc,
                                          cc.GetCalleeSavedRegisters());
-        }),
+        },
 
-        "int_arg_regs", sol::property([](sol::this_state ts,
-                                          CallingConvention& cc)
-                                          -> sol::table {
+        "int_arg_regs", [](sol::this_state ts, CallingConvention& cc)
+                             -> sol::table {
             return RegIndicesToNameTable(sol::state_view(ts), cc,
                                          cc.GetIntegerArgumentRegisters());
-        }),
+        },
 
-        "float_arg_regs", sol::property([](sol::this_state ts,
-                                            CallingConvention& cc)
-                                            -> sol::table {
+        "float_arg_regs", [](sol::this_state ts, CallingConvention& cc)
+                               -> sol::table {
             return RegIndicesToNameTable(sol::state_view(ts), cc,
                                          cc.GetFloatArgumentRegisters());
-        }),
+        },
 
-        "required_arg_regs", sol::property([](sol::this_state ts,
-                                               CallingConvention& cc)
-                                               -> sol::table {
+        "required_arg_regs", [](sol::this_state ts, CallingConvention& cc)
+                                  -> sol::table {
             return RegIndicesToNameTable(sol::state_view(ts), cc,
                                          cc.GetRequiredArgumentRegisters());
-        }),
+        },
 
-        "required_clobbered_regs", sol::property([](sol::this_state ts,
-                                                     CallingConvention& cc)
-                                                     -> sol::table {
+        "required_clobbered_regs",
+        [](sol::this_state ts, CallingConvention& cc) -> sol::table {
             return RegIndicesToNameTable(
                 sol::state_view(ts), cc,
                 cc.GetRequiredClobberedRegisters());
-        }),
+        },
 
-        "implicitly_defined_regs", sol::property([](sol::this_state ts,
-                                                     CallingConvention& cc)
-                                                     -> sol::table {
+        "implicitly_defined_regs",
+        [](sol::this_state ts, CallingConvention& cc) -> sol::table {
             return RegIndicesToNameTable(
                 sol::state_view(ts), cc,
                 cc.GetImplicitlyDefinedRegisters());
-        }),
+        },
 
-        // Return / special single-register properties. Apply the
+        // Return / special single-register accessors. Apply the
         // 0xffffffff -> nil sentinel rule per
-        // python/callingconvention.py:192-214.
+        // python/callingconvention.py:192-214. Same method-form
+        // workaround as above.
 
-        "int_return_reg", sol::property([](sol::this_state ts,
-                                            CallingConvention& cc)
-                                            -> sol::object {
+        "int_return_reg", [](sol::this_state ts, CallingConvention& cc)
+                               -> sol::object {
             return ReturnRegOrNil(ts, cc,
                                   cc.GetIntegerReturnValueRegister());
-        }),
+        },
 
-        "high_int_return_reg", sol::property([](sol::this_state ts,
-                                                 CallingConvention& cc)
-                                                 -> sol::object {
+        "high_int_return_reg", [](sol::this_state ts, CallingConvention& cc)
+                                    -> sol::object {
             return ReturnRegOrNil(ts, cc,
                                   cc.GetHighIntegerReturnValueRegister());
-        }),
+        },
 
-        "float_return_reg", sol::property([](sol::this_state ts,
-                                              CallingConvention& cc)
-                                              -> sol::object {
+        "float_return_reg", [](sol::this_state ts, CallingConvention& cc)
+                                 -> sol::object {
             return ReturnRegOrNil(ts, cc,
                                   cc.GetFloatReturnValueRegister());
-        }),
+        },
 
-        "global_pointer_reg", sol::property([](sol::this_state ts,
-                                                 CallingConvention& cc)
-                                                 -> sol::object {
+        "global_pointer_reg", [](sol::this_state ts, CallingConvention& cc)
+                                   -> sol::object {
             return ReturnRegOrNil(ts, cc, cc.GetGlobalPointerRegister());
-        }),
+        },
 
         // Boolean heuristics flags. Names match Python verbatim at
         // python/callingconvention.py:126-130.
