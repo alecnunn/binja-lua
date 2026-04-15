@@ -750,16 +750,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
                 sol::table entry = lua.create_table();
                 entry["name"] = refs[i].name.GetString();
                 entry["offset"] = refs[i].offset;
-
-                // Convert type to string
-                std::string refType;
-                switch (refs[i].type) {
-                    case BNTypeReferenceType::DirectTypeReferenceType: refType = "direct"; break;
-                    case BNTypeReferenceType::IndirectTypeReferenceType: refType = "indirect"; break;
-                    default: refType = "unknown"; break;
-                }
-                entry["ref_type"] = refType;
-
+                entry["ref_type"] = EnumToString(refs[i].type);
                 result[i + 1] = entry;
             }
             return result;

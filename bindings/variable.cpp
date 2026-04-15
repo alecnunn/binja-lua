@@ -55,16 +55,7 @@ void VariableWrapper::ResolveType() const {
 }
 
 std::string VariableWrapper::GetSourceTypeString() const {
-    switch (bnVar.type) {
-        case BNVariableSourceType::StackVariableSourceType:
-            return "local";
-        case BNVariableSourceType::RegisterVariableSourceType:
-            return "register";
-        case BNVariableSourceType::FlagVariableSourceType:
-            return "flag";
-        default:
-            return "unknown";
-    }
+    return EnumToString(bnVar.type);
 }
 
 std::string VariableWrapper::GetName() const {

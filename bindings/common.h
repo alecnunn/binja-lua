@@ -294,6 +294,29 @@ inline const char* EnumToString(BNSymbolBinding binding) {
     return "unknown";
 }
 
+inline const char* EnumToString(BNVariableSourceType source) {
+    switch (source) {
+        case StackVariableSourceType:    return "local";
+        case RegisterVariableSourceType: return "register";
+        case FlagVariableSourceType:     return "flag";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNTypeReferenceType ref) {
+    // Qualify every enumerator explicitly: the BinaryNinja::ReferenceType
+    // enum in binaryninjaapi.h:4983 uses the same unqualified names
+    // (DirectTypeReferenceType, IndirectTypeReferenceType, ...) and
+    // resolving through the `BN` C enum type is the only way to pick
+    // the right overload here.
+    switch (ref) {
+        case ::DirectTypeReferenceType:   return "direct";
+        case ::IndirectTypeReferenceType: return "indirect";
+        case ::UnknownTypeReferenceType:  return "unknown";
+    }
+    return "unknown";
+}
+
 // Dual-accept reverse lookup for every enum that has an EnumToString
 // helper. Each specialization accepts BOTH the short canonical Lua
 // string produced by EnumToString (e.g. "unconditional", "Function",
@@ -499,6 +522,30 @@ inline std::optional<BNSymbolBinding> EnumFromString<BNSymbolBinding>(
     if (s == "local" || s == "LocalBinding") return LocalBinding;
     if (s == "global" || s == "GlobalBinding") return GlobalBinding;
     if (s == "weak" || s == "WeakBinding") return WeakBinding;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNVariableSourceType>
+EnumFromString<BNVariableSourceType>(const std::string& s) {
+    if (s == "local" || s == "StackVariableSourceType")
+        return StackVariableSourceType;
+    if (s == "register" || s == "RegisterVariableSourceType")
+        return RegisterVariableSourceType;
+    if (s == "flag" || s == "FlagVariableSourceType")
+        return FlagVariableSourceType;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNTypeReferenceType>
+EnumFromString<BNTypeReferenceType>(const std::string& s) {
+    if (s == "direct" || s == "DirectTypeReferenceType")
+        return ::DirectTypeReferenceType;
+    if (s == "indirect" || s == "IndirectTypeReferenceType")
+        return ::IndirectTypeReferenceType;
+    if (s == "unknown" || s == "UnknownTypeReferenceType")
+        return ::UnknownTypeReferenceType;
     return std::nullopt;
 }
 

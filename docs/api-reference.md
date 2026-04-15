@@ -254,6 +254,27 @@ Used on `Symbol.binding`.
 | `global` | `GlobalBinding` |
 | `weak`   | `WeakBinding`   |
 
+### BNVariableSourceType
+
+Used on `Variable.source_type`.
+
+| Lua        | Python                        |
+|------------|-------------------------------|
+| `local`    | `StackVariableSourceType`     |
+| `register` | `RegisterVariableSourceType`  |
+| `flag`     | `FlagVariableSourceType`      |
+
+### BNTypeReferenceType
+
+Used on the `ref_type` field of entries returned by
+`BinaryView:get_type_refs_for_type`.
+
+| Lua        | Python                        |
+|------------|-------------------------------|
+| `direct`   | `DirectTypeReferenceType`     |
+| `indirect` | `IndirectTypeReferenceType`   |
+| `unknown`  | `UnknownTypeReferenceType`    |
+
 ## Metadata round-trip
 
 `BinaryView:store_metadata` / `BinaryView:query_metadata` and the
