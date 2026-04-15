@@ -126,7 +126,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "get_symbols_of_type", [](sol::this_state ts, BinaryView& bv,
                                   const std::string& type_name) -> sol::table {
             sol::state_view lua(ts);
-            auto type = SymbolTypeFromString(type_name);
+            auto type = EnumFromString<BNSymbolType>(type_name);
             if (!type) {
                 return lua.create_table();
             }

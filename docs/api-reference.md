@@ -22,6 +22,156 @@ usertype. It is spelled out explicitly because `end` is a Lua
 reserved keyword and had to be accessed as `obj["end"]` anyway; the
 bracket form is no longer supported.
 
+## Enum vocabulary
+
+Several properties return BN enum values as strings, and a few
+methods accept enum values as string arguments. The Lua-visible
+**output** is always the short canonical form listed in the "Lua"
+column below. Any method that **accepts** an enum string will also
+accept the verbatim Python/C enumerator name from the "Python"
+column - either form is fine. Matches are case-sensitive.
+
+Python users porting code from `binaryninja-api/python/*.py` can
+paste enum names straight over; script authors who want terser
+Lua can use the short names.
+
+### BNBranchType
+
+Used on `FlowGraphEdge.branch_type`, `BasicBlock:outgoing_edges`,
+`BasicBlock:incoming_edges`, and `FlowGraphNode:add_outgoing_edge`.
+
+| Lua              | Python               |
+|------------------|----------------------|
+| `unconditional`  | `UnconditionalBranch`|
+| `false`          | `FalseBranch`        |
+| `true`           | `TrueBranch`         |
+| `call`           | `CallDestination`    |
+| `return`         | `FunctionReturn`     |
+| `syscall`        | `SystemCall`         |
+| `indirect`       | `IndirectBranch`     |
+| `exception`      | `ExceptionBranch`    |
+| `unresolved`     | `UnresolvedBranch`   |
+| `user_defined`   | `UserDefinedBranch`  |
+
+### BNSymbolType
+
+Used on `Symbol.type` and as input to
+`BinaryView:get_symbols_of_type`.
+
+| Lua                 | Python                    |
+|---------------------|---------------------------|
+| `Function`          | `FunctionSymbol`          |
+| `ImportAddress`     | `ImportAddressSymbol`     |
+| `ImportedFunction`  | `ImportedFunctionSymbol`  |
+| `Data`              | `DataSymbol`              |
+| `ImportedData`      | `ImportedDataSymbol`      |
+| `External`          | `ExternalSymbol`          |
+| `LibraryFunction`   | `LibraryFunctionSymbol`   |
+| `SymbolicFunction`  | `SymbolicFunctionSymbol`  |
+| `LocalLabel`        | `LocalLabelSymbol`        |
+
+### BNSectionSemantics
+
+Used on `Section.semantics`.
+
+| Lua        | Python                           |
+|------------|----------------------------------|
+| `default`  | `DefaultSectionSemantics`        |
+| `code`     | `ReadOnlyCodeSectionSemantics`   |
+| `ro_data`  | `ReadOnlyDataSectionSemantics`   |
+| `rw_data`  | `ReadWriteDataSectionSemantics`  |
+| `external` | `ExternalSectionSemantics`       |
+
+### BNTypeClass
+
+Used on `Type.type_class`.
+
+| Lua                    | Python                   |
+|------------------------|--------------------------|
+| `Void`                 | `VoidTypeClass`          |
+| `Bool`                 | `BoolTypeClass`          |
+| `Integer`              | `IntegerTypeClass`       |
+| `Float`                | `FloatTypeClass`         |
+| `Structure`            | `StructureTypeClass`     |
+| `Enumeration`          | `EnumerationTypeClass`   |
+| `Pointer`              | `PointerTypeClass`       |
+| `Array`                | `ArrayTypeClass`         |
+| `Function`             | `FunctionTypeClass`      |
+| `VarArgs`              | `VarArgsTypeClass`       |
+| `Value`                | `ValueTypeClass`         |
+| `NamedTypeReference`   | `NamedTypeReferenceClass`|
+| `WideChar`             | `WideCharTypeClass`      |
+
+### BNAnalysisState
+
+Used on the `state` field of `BinaryView:get_analysis_progress()`.
+
+| Lua                | Python                |
+|--------------------|-----------------------|
+| `initial`          | `InitialState`        |
+| `hold`             | `HoldState`           |
+| `idle`             | `IdleState`           |
+| `discovery`        | `DiscoveryState`      |
+| `disassemble`      | `DisassembleState`    |
+| `analyze`          | `AnalyzeState`        |
+| `extended_analyze` | `ExtendedAnalyzeState`|
+
+### BNAnalysisSkipReason
+
+Used on `Function.analysis_skip_reason`.
+
+| Lua                      | Python                                     |
+|--------------------------|--------------------------------------------|
+| `none`                   | `NoSkipReason`                             |
+| `always`                 | `AlwaysSkipReason`                         |
+| `exceed_size`            | `ExceedFunctionSizeSkipReason`             |
+| `exceed_time`            | `ExceedFunctionAnalysisTimeSkipReason`     |
+| `exceed_updates`         | `ExceedFunctionUpdateCountSkipReason`      |
+| `new_auto_suppressed`    | `NewAutoFunctionAnalysisSuppressedReason`  |
+| `basic_analysis`         | `BasicAnalysisSkipReason`                  |
+| `intermediate_analysis`  | `IntermediateAnalysisSkipReason`           |
+| `pipeline_suspended`     | `AnalysisPipelineSuspendedReason`          |
+
+### BNMetadataType
+
+Used internally by `MetadataCodec` (no direct Lua-visible property
+today; listed for completeness).
+
+| Lua                | Python                    |
+|--------------------|---------------------------|
+| `invalid`          | `InvalidDataType`         |
+| `boolean`          | `BooleanDataType`         |
+| `string`           | `StringDataType`          |
+| `unsigned_integer` | `UnsignedIntegerDataType` |
+| `signed_integer`   | `SignedIntegerDataType`   |
+| `double`           | `DoubleDataType`          |
+| `raw`              | `RawDataType`             |
+| `key_value`        | `KeyValueDataType`        |
+| `array`            | `ArrayDataType`           |
+
+### BNMemberAccess
+
+Used on structure member metadata (no direct Lua-visible property
+today; listed for completeness).
+
+| Lua         | Python            |
+|-------------|-------------------|
+| `none`      | `NoAccess`        |
+| `private`   | `PrivateAccess`   |
+| `protected` | `ProtectedAccess` |
+| `public`    | `PublicAccess`    |
+
+### BNSymbolBinding
+
+Used on `Symbol.binding`.
+
+| Lua      | Python          |
+|----------|-----------------|
+| `none`   | `NoBinding`     |
+| `local`  | `LocalBinding`  |
+| `global` | `GlobalBinding` |
+| `weak`   | `WeakBinding`   |
+
 ## Table of Contents
 
 - [HexAddress](#hexaddress)

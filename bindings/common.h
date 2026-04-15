@@ -158,22 +158,6 @@ inline const char* EnumToString(BNSymbolType type) {
     return "Unknown";
 }
 
-// Reverse lookup for the BNSymbolType vocabulary. Returns nullopt for
-// unrecognised input; callers decide how to surface the error.
-inline std::optional<BNSymbolType> SymbolTypeFromString(
-    const std::string& s) {
-    if (s == "Function")         return FunctionSymbol;
-    if (s == "ImportAddress")    return ImportAddressSymbol;
-    if (s == "ImportedFunction") return ImportedFunctionSymbol;
-    if (s == "Data")             return DataSymbol;
-    if (s == "ImportedData")     return ImportedDataSymbol;
-    if (s == "External")         return ExternalSymbol;
-    if (s == "LibraryFunction")  return LibraryFunctionSymbol;
-    if (s == "SymbolicFunction") return SymbolicFunctionSymbol;
-    if (s == "LocalLabel")       return LocalLabelSymbol;
-    return std::nullopt;
-}
-
 inline const char* EnumToString(BNSectionSemantics semantics) {
     switch (semantics) {
         case DefaultSectionSemantics:       return "default";
@@ -265,6 +249,170 @@ inline const char* EnumToString(BNSymbolBinding binding) {
         case WeakBinding:   return "weak";
     }
     return "unknown";
+}
+
+// Dual-accept reverse lookup for every enum that has an EnumToString
+// helper. Each specialization accepts BOTH the short canonical Lua
+// string produced by EnumToString (e.g. "unconditional", "Function",
+// "ro_data", "idle", "basic_analysis") AND the verbatim C/Python
+// enumerator name (e.g. "UnconditionalBranch", "FunctionSymbol",
+// "ReadOnlyCodeSectionSemantics", "IdleState", "BasicAnalysisSkipReason").
+// Matches are case-sensitive and return std::nullopt on miss.
+//
+// See docs/api-reference.md "Enum vocabulary" for the full table.
+template <typename E>
+std::optional<E> EnumFromString(const std::string& s);
+
+template <>
+inline std::optional<BNBranchType> EnumFromString<BNBranchType>(
+    const std::string& s) {
+    if (s == "unconditional" || s == "UnconditionalBranch")
+        return UnconditionalBranch;
+    if (s == "false" || s == "FalseBranch") return FalseBranch;
+    if (s == "true"  || s == "TrueBranch")  return TrueBranch;
+    if (s == "call"  || s == "CallDestination") return CallDestination;
+    if (s == "return" || s == "FunctionReturn") return FunctionReturn;
+    if (s == "syscall" || s == "SystemCall") return SystemCall;
+    if (s == "indirect" || s == "IndirectBranch") return IndirectBranch;
+    if (s == "exception" || s == "ExceptionBranch") return ExceptionBranch;
+    if (s == "unresolved" || s == "UnresolvedBranch") return UnresolvedBranch;
+    if (s == "user_defined" || s == "UserDefinedBranch")
+        return UserDefinedBranch;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNSymbolType> EnumFromString<BNSymbolType>(
+    const std::string& s) {
+    if (s == "Function" || s == "FunctionSymbol") return FunctionSymbol;
+    if (s == "ImportAddress" || s == "ImportAddressSymbol")
+        return ImportAddressSymbol;
+    if (s == "ImportedFunction" || s == "ImportedFunctionSymbol")
+        return ImportedFunctionSymbol;
+    if (s == "Data" || s == "DataSymbol") return DataSymbol;
+    if (s == "ImportedData" || s == "ImportedDataSymbol")
+        return ImportedDataSymbol;
+    if (s == "External" || s == "ExternalSymbol") return ExternalSymbol;
+    if (s == "LibraryFunction" || s == "LibraryFunctionSymbol")
+        return LibraryFunctionSymbol;
+    if (s == "SymbolicFunction" || s == "SymbolicFunctionSymbol")
+        return SymbolicFunctionSymbol;
+    if (s == "LocalLabel" || s == "LocalLabelSymbol") return LocalLabelSymbol;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNSectionSemantics>
+EnumFromString<BNSectionSemantics>(const std::string& s) {
+    if (s == "default" || s == "DefaultSectionSemantics")
+        return DefaultSectionSemantics;
+    if (s == "code" || s == "ReadOnlyCodeSectionSemantics")
+        return ReadOnlyCodeSectionSemantics;
+    if (s == "ro_data" || s == "ReadOnlyDataSectionSemantics")
+        return ReadOnlyDataSectionSemantics;
+    if (s == "rw_data" || s == "ReadWriteDataSectionSemantics")
+        return ReadWriteDataSectionSemantics;
+    if (s == "external" || s == "ExternalSectionSemantics")
+        return ExternalSectionSemantics;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNTypeClass> EnumFromString<BNTypeClass>(
+    const std::string& s) {
+    if (s == "Void" || s == "VoidTypeClass") return VoidTypeClass;
+    if (s == "Bool" || s == "BoolTypeClass") return BoolTypeClass;
+    if (s == "Integer" || s == "IntegerTypeClass") return IntegerTypeClass;
+    if (s == "Float" || s == "FloatTypeClass") return FloatTypeClass;
+    if (s == "Structure" || s == "StructureTypeClass")
+        return StructureTypeClass;
+    if (s == "Enumeration" || s == "EnumerationTypeClass")
+        return EnumerationTypeClass;
+    if (s == "Pointer" || s == "PointerTypeClass") return PointerTypeClass;
+    if (s == "Array" || s == "ArrayTypeClass") return ArrayTypeClass;
+    if (s == "Function" || s == "FunctionTypeClass") return FunctionTypeClass;
+    if (s == "VarArgs" || s == "VarArgsTypeClass") return VarArgsTypeClass;
+    if (s == "Value" || s == "ValueTypeClass") return ValueTypeClass;
+    if (s == "NamedTypeReference" || s == "NamedTypeReferenceClass")
+        return NamedTypeReferenceClass;
+    if (s == "WideChar" || s == "WideCharTypeClass") return WideCharTypeClass;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNAnalysisState> EnumFromString<BNAnalysisState>(
+    const std::string& s) {
+    if (s == "initial" || s == "InitialState") return InitialState;
+    if (s == "hold" || s == "HoldState") return HoldState;
+    if (s == "idle" || s == "IdleState") return IdleState;
+    if (s == "discovery" || s == "DiscoveryState") return DiscoveryState;
+    if (s == "disassemble" || s == "DisassembleState")
+        return DisassembleState;
+    if (s == "analyze" || s == "AnalyzeState") return AnalyzeState;
+    if (s == "extended_analyze" || s == "ExtendedAnalyzeState")
+        return ExtendedAnalyzeState;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNAnalysisSkipReason>
+EnumFromString<BNAnalysisSkipReason>(const std::string& s) {
+    if (s == "none" || s == "NoSkipReason") return NoSkipReason;
+    if (s == "always" || s == "AlwaysSkipReason") return AlwaysSkipReason;
+    if (s == "exceed_size" || s == "ExceedFunctionSizeSkipReason")
+        return ExceedFunctionSizeSkipReason;
+    if (s == "exceed_time" || s == "ExceedFunctionAnalysisTimeSkipReason")
+        return ExceedFunctionAnalysisTimeSkipReason;
+    if (s == "exceed_updates" || s == "ExceedFunctionUpdateCountSkipReason")
+        return ExceedFunctionUpdateCountSkipReason;
+    if (s == "new_auto_suppressed" ||
+        s == "NewAutoFunctionAnalysisSuppressedReason")
+        return NewAutoFunctionAnalysisSuppressedReason;
+    if (s == "basic_analysis" || s == "BasicAnalysisSkipReason")
+        return BasicAnalysisSkipReason;
+    if (s == "intermediate_analysis" ||
+        s == "IntermediateAnalysisSkipReason")
+        return IntermediateAnalysisSkipReason;
+    if (s == "pipeline_suspended" || s == "AnalysisPipelineSuspendedReason")
+        return AnalysisPipelineSuspendedReason;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNMetadataType> EnumFromString<BNMetadataType>(
+    const std::string& s) {
+    if (s == "invalid" || s == "InvalidDataType") return InvalidDataType;
+    if (s == "boolean" || s == "BooleanDataType") return BooleanDataType;
+    if (s == "string" || s == "StringDataType") return StringDataType;
+    if (s == "unsigned_integer" || s == "UnsignedIntegerDataType")
+        return UnsignedIntegerDataType;
+    if (s == "signed_integer" || s == "SignedIntegerDataType")
+        return SignedIntegerDataType;
+    if (s == "double" || s == "DoubleDataType") return DoubleDataType;
+    if (s == "raw" || s == "RawDataType") return RawDataType;
+    if (s == "key_value" || s == "KeyValueDataType") return KeyValueDataType;
+    if (s == "array" || s == "ArrayDataType") return ArrayDataType;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNMemberAccess> EnumFromString<BNMemberAccess>(
+    const std::string& s) {
+    if (s == "none" || s == "NoAccess") return NoAccess;
+    if (s == "private" || s == "PrivateAccess") return PrivateAccess;
+    if (s == "protected" || s == "ProtectedAccess") return ProtectedAccess;
+    if (s == "public" || s == "PublicAccess") return PublicAccess;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNSymbolBinding> EnumFromString<BNSymbolBinding>(
+    const std::string& s) {
+    if (s == "none" || s == "NoBinding") return NoBinding;
+    if (s == "local" || s == "LocalBinding") return LocalBinding;
+    if (s == "global" || s == "GlobalBinding") return GlobalBinding;
+    if (s == "weak" || s == "WeakBinding") return WeakBinding;
+    return std::nullopt;
 }
 
 // Build a Lua table describing a ReferenceSource. Shape matches the
