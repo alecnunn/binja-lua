@@ -131,6 +131,9 @@ set(BINDING_SOURCES
     bindings/tag.cpp
     bindings/il.cpp
     bindings/flowgraph.cpp
+    bindings/section.cpp
+    bindings/symbol.cpp
+    bindings/selection.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED
