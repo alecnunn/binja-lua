@@ -176,25 +176,58 @@ BNMetadata* MetadataFromLua(sol::object value, bool prefer_unsigned) {
     }
 
     if (value.is<std::string>()) {
-        // Lua strings are 8-bit clean; pass them through as StringData.
-        // There is no Lua-level "raw bytes" distinction, so Raw is a
-        // decode-only variant - encoding always produces StringData.
-        const std::string& s = value.as<std::string>();
+        // Lua strings are 8-bit clean and length-prefixed. The old
+        // code used BNCreateMetadataStringData(s.c_str()) which
+        // truncates at the first NUL, silently losing bytes for
+        // keys that carry binary payloads. Detect embedded NULs and
+        // route those through BNCreateMetadataRawData so the whole
+        // buffer survives the round trip. NUL-free strings keep
+        // StringData semantics for cross-language round-tripping
+        // with Python writers.
+        std::string s = value.as<std::string>();
+        if (s.find('\0') != std::string::npos) {
+            return BNCreateMetadataRawData(
+                reinterpret_cast<const uint8_t*>(s.data()), s.size());
+        }
         return BNCreateMetadataStringData(s.c_str());
     }
 
     if (value.get_type() == sol::type::number) {
-        double d = value.as<double>();
-        if (d == std::floor(d) && d >= static_cast<double>(INT64_MIN) &&
-            d <= static_cast<double>(INT64_MAX)) {
-            if (prefer_unsigned && d >= 0.0) {
+        // Lua 5.4 distinguishes integer and float at runtime. The
+        // old code routed everything through double, which silently
+        // lost precision for integers above 2^53 (the common case
+        // for addresses and flag masks). Use lua_isinteger on the
+        // pushed value to pick the correct BN metadata type.
+        lua_State* L = value.lua_state();
+        value.push(L);
+        const bool is_integer = lua_isinteger(L, -1) != 0;
+        lua_Integer lua_int = is_integer ? lua_tointeger(L, -1) : 0;
+        const double lua_double = is_integer ? 0.0 : lua_tonumber(L, -1);
+        lua_pop(L, 1);
+
+        if (is_integer) {
+            if (prefer_unsigned && lua_int >= 0) {
                 return BNCreateMetadataUnsignedIntegerData(
-                    static_cast<uint64_t>(d));
+                    static_cast<uint64_t>(lua_int));
             }
             return BNCreateMetadataSignedIntegerData(
-                static_cast<int64_t>(d));
+                static_cast<int64_t>(lua_int));
         }
-        return BNCreateMetadataDoubleData(d);
+
+        // Float path: integer-valued floats still get signed
+        // integer encoding so a number like 0.0 or 42.0 round-trips
+        // to the same shape it had under the old codec.
+        if (lua_double == std::floor(lua_double) &&
+            lua_double >= static_cast<double>(INT64_MIN) &&
+            lua_double <= static_cast<double>(INT64_MAX)) {
+            if (prefer_unsigned && lua_double >= 0.0) {
+                return BNCreateMetadataUnsignedIntegerData(
+                    static_cast<uint64_t>(lua_double));
+            }
+            return BNCreateMetadataSignedIntegerData(
+                static_cast<int64_t>(lua_double));
+        }
+        return BNCreateMetadataDoubleData(lua_double);
     }
 
     if (!value.is<sol::table>()) {

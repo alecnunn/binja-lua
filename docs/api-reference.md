@@ -265,9 +265,11 @@ Lua-flavoured choices worth knowing about.
 | Lua input              | BNMetadataType stored             | Comes back as            |
 |------------------------|-----------------------------------|--------------------------|
 | `true` / `false`       | `BooleanDataType`                 | Lua boolean              |
-| string                 | `StringDataType`                  | Lua string               |
-| integer-valued number  | `SignedIntegerDataType` (default) | Lua integer              |
-| fractional number      | `DoubleDataType`                  | Lua number               |
+| string, no embedded NUL| `StringDataType`                  | Lua string               |
+| string with embedded NUL| `RawDataType` (length-preserving)| Lua string               |
+| Lua integer            | `SignedIntegerDataType` (default) | Lua integer              |
+| integer-valued float   | `SignedIntegerDataType` (default) | Lua integer              |
+| fractional float       | `DoubleDataType`                  | Lua number               |
 | 1-indexed array table  | `ArrayDataType` (recursive)       | 1-indexed array table    |
 | string-keyed table     | `KeyValueDataType` (recursive)    | string-keyed table       |
 
@@ -277,30 +279,36 @@ nested tables work without restriction. A key-value store whose
 values include arrays, or an array whose elements are themselves
 nested tables, round-trips to an equivalent Lua structure.
 
-`RawDataType` is decode-only: if some other producer (Python,
-another plugin) stores a raw byte buffer under a metadata key,
-`query_metadata` returns it as a Lua string that preserves
-embedded nulls. There is no encode path for raw - Lua strings
-always round-trip as `StringDataType`, because Lua has no
-distinct binary-blob type. If you need explicit binary metadata,
-create it from Python or C++ and read it back from Lua.
+Strings with embedded NUL bytes are encoded through
+`BNCreateMetadataRawData` so the full length round-trips (task
+#13). Strings without embedded NULs stay on the StringData path
+to preserve cross-language round-tripping with Python writers
+that store ordinary text under a key. On read, both the
+StringData and RawData paths materialize back into a Lua string
+that preserves the original bytes exactly.
 
 `InvalidDataType` is a sentinel and maps to `nil` on read - it
 should not appear for metadata your scripts wrote, and Python
 raises `TypeError` in the same spot.
 
-### Integer encoding defaults to signed
+### Integer encoding: 64-bit precision and signedness
 
-Lua's `lua_Integer` is signed, so `MetadataFromLua` encodes
-integer-valued numbers as `SignedIntegerDataType` by default.
-This diverges from Python, which defaults unsigned in
-`Metadata.__init__` when the `signed` kwarg is falsy. The
-internal helper accepts a `prefer_unsigned=true` flag that
-forces `BNCreateMetadataUnsignedIntegerData` for non-negative
-values (and recursively for every child of an array or
-key-value table); the Lua-facing `store_metadata` method does
-not currently surface this flag. If you need unsigned encoding
-for a specific key, store it from Python.
+`MetadataFromLua` distinguishes Lua 5.4 integers from floats via
+`lua_isinteger` and routes them separately. Lua integers use the
+full 64-bit `lua_Integer` path so values above 2^53 round-trip
+losslessly (task #13); integer-valued floats also take the
+integer path for consistency with pre-task-#13 scripts.
+
+Lua's `lua_Integer` is signed, so integer values encode as
+`SignedIntegerDataType` by default. This diverges from Python,
+which defaults unsigned in `Metadata.__init__` when the
+`signed` kwarg is falsy. The internal helper accepts a
+`prefer_unsigned=true` flag that forces
+`BNCreateMetadataUnsignedIntegerData` for non-negative values
+(and recursively for every child of an array or key-value
+table); the Lua-facing `store_metadata` method does not
+currently surface this flag. If you need unsigned encoding for
+a specific key, store it from Python.
 
 On read, `UnsignedIntegerDataType` and `SignedIntegerDataType`
 are both decoded correctly - the signed/unsigned divergence is
