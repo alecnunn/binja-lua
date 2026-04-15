@@ -807,99 +807,11 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "store_metadata", [](sol::this_state ts, BinaryView& bv,
                             const std::string& key, sol::object value,
                             sol::optional<bool> isAuto) {
-            BNMetadata* md = nullptr;
-
-            if (value.is<bool>()) {
-                md = BNCreateMetadataBooleanData(value.as<bool>());
-            } else if (value.is<std::string>()) {
-                md = BNCreateMetadataStringData(value.as<std::string>().c_str());
-            } else if (value.get_type() == sol::type::number) {
-                // Handle all numbers - check if integer or float
-                double d = value.as<double>();
-                // Check if it's actually a whole number (no fractional part)
-                if (d == std::floor(d) && d >= INT64_MIN && d <= INT64_MAX) {
-                    md = BNCreateMetadataSignedIntegerData(static_cast<int64_t>(d));
-                } else {
-                    md = BNCreateMetadataDoubleData(d);
-                }
-            } else if (value.is<sol::table>()) {
-                // Check if it's an array or a key-value table
-                sol::table tbl = value.as<sol::table>();
-                bool isArray = true;
-                size_t expectedIdx = 1;
-                for (auto& kv : tbl) {
-                    if (!kv.first.is<size_t>() || kv.first.as<size_t>() != expectedIdx) {
-                        isArray = false;
-                        break;
-                    }
-                    expectedIdx++;
-                }
-
-                if (isArray && expectedIdx > 1) {
-                    // Array of strings (most common case)
-                    std::vector<const char*> strValues;
-                    std::vector<std::string> strStorage;
-                    bool allStrings = true;
-
-                    for (auto& kv : tbl) {
-                        if (kv.second.is<std::string>()) {
-                            strStorage.push_back(kv.second.as<std::string>());
-                        } else {
-                            allStrings = false;
-                            break;
-                        }
-                    }
-
-                    if (allStrings && !strStorage.empty()) {
-                        for (const auto& s : strStorage) {
-                            strValues.push_back(s.c_str());
-                        }
-                        md = BNCreateMetadataStringListData(strValues.data(), strValues.size());
-                    }
-                } else {
-                    // Key-value store
-                    std::vector<const char*> keys;
-                    std::vector<BNMetadata*> values;
-                    std::vector<std::string> keyStorage;
-
-                    for (auto& kv : tbl) {
-                        if (kv.first.is<std::string>()) {
-                            keyStorage.push_back(kv.first.as<std::string>());
-
-                            BNMetadata* val = nullptr;
-                            if (kv.second.is<bool>()) {
-                                val = BNCreateMetadataBooleanData(kv.second.as<bool>());
-                            } else if (kv.second.is<std::string>()) {
-                                val = BNCreateMetadataStringData(
-                                    kv.second.as<std::string>().c_str());
-                            } else if (kv.second.is<int64_t>()) {
-                                val = BNCreateMetadataSignedIntegerData(kv.second.as<int64_t>());
-                            } else if (kv.second.is<double>()) {
-                                val = BNCreateMetadataDoubleData(kv.second.as<double>());
-                            }
-
-                            if (val) {
-                                values.push_back(val);
-                            }
-                        }
-                    }
-
-                    if (!keyStorage.empty() && keyStorage.size() == values.size()) {
-                        for (const auto& k : keyStorage) {
-                            keys.push_back(k.c_str());
-                        }
-                        md = BNCreateMetadataValueStore(keys.data(), values.data(), keys.size());
-                    }
-
-                    // Free intermediate metadata objects
-                    for (auto* v : values) {
-                        BNFreeMetadata(v);
-                    }
-                }
-            }
-
+            (void)ts;
+            BNMetadata* md = MetadataFromLua(value);
             if (md) {
-                BNBinaryViewStoreMetadata(BinaryView::GetObject(&bv), key.c_str(), md,
+                BNBinaryViewStoreMetadata(BinaryView::GetObject(&bv),
+                                         key.c_str(), md,
                                          isAuto.value_or(false));
                 BNFreeMetadata(md);
             }
@@ -909,73 +821,12 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "query_metadata", [](sol::this_state ts, BinaryView& bv,
                             const std::string& key) -> sol::object {
             sol::state_view lua(ts);
-
-            BNMetadata* md = BNBinaryViewQueryMetadata(BinaryView::GetObject(&bv), key.c_str());
+            BNMetadata* md = BNBinaryViewQueryMetadata(
+                BinaryView::GetObject(&bv), key.c_str());
             if (!md) {
                 return sol::make_object(lua, sol::nil);
             }
-
-            sol::object result = sol::make_object(lua, sol::nil);
-            BNMetadataType type = BNMetadataGetType(md);
-
-            switch (type) {
-                case BooleanDataType:
-                    result = sol::make_object(lua, BNMetadataGetBoolean(md));
-                    break;
-                case StringDataType: {
-                    char* str = BNMetadataGetString(md);
-                    if (str) {
-                        result = sol::make_object(lua, std::string(str));
-                        BNFreeString(str);
-                    }
-                    break;
-                }
-                case UnsignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetUnsignedInteger(md));
-                    break;
-                case SignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetSignedInteger(md));
-                    break;
-                case DoubleDataType:
-                    result = sol::make_object(lua, BNMetadataGetDouble(md));
-                    break;
-                case KeyValueDataType: {
-                    BNMetadataValueStore* store = BNMetadataGetValueStore(md);
-                    if (store) {
-                        sol::table tbl = lua.create_table();
-                        for (size_t i = 0; i < store->size; i++) {
-                            BNMetadataType vtype = BNMetadataGetType(store->values[i]);
-                            if (vtype == StringDataType) {
-                                char* str = BNMetadataGetString(store->values[i]);
-                                if (str) {
-                                    tbl[store->keys[i]] = std::string(str);
-                                    BNFreeString(str);
-                                }
-                            } else if (vtype == BooleanDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetBoolean(store->values[i]);
-                            } else if (vtype == SignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetSignedInteger(store->values[i]);
-                            } else if (vtype == UnsignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetUnsignedInteger(store->values[i]);
-                            } else if (vtype == DoubleDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetDouble(store->values[i]);
-                            }
-                        }
-                        result = sol::make_object(lua, tbl);
-                        BNFreeMetadataValueStore(store);
-                    }
-                    break;
-                }
-                default:
-                    // For arrays and other types, return as JSON string
-                    char* json = BNMetadataGetJsonString(md);
-                    if (json) {
-                        result = sol::make_object(lua, std::string(json));
-                        BNFreeString(json);
-                    }
-                    break;
-            }
-
+            sol::object result = MetadataToLua(lua, md);
             BNFreeMetadata(md);
             return result;
         },

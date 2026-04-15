@@ -278,6 +278,23 @@ inline sol::table ReferenceSourcesToTable(
     return result;
 }
 
+// Metadata <-> Lua value marshalling. Both directions are shared by the
+// BinaryView and Function metadata accessors so the translation logic
+// lives in one place instead of being copy-pasted into each usertype.
+//
+// MetadataToLua reads a BNMetadata* and returns a Lua-side representation
+// without taking ownership of the metadata object - the caller is still
+// responsible for freeing it.
+//
+// MetadataFromLua creates a fresh BNMetadata* from a Lua value. The caller
+// takes ownership and must call BNFreeMetadata on the returned pointer.
+// Supported Lua input types: bool, string, integer, number, an
+// integer-indexed table of strings (stored as a string list), and a
+// string-keyed table of scalars (stored as a key-value store). Unsupported
+// values return nullptr.
+sol::object MetadataToLua(sol::state_view lua, BNMetadata* md);
+BNMetadata* MetadataFromLua(sol::object value);
+
 // Extract a uint64_t address from a Lua-side value that may be a
 // HexAddress, integer, or floating-point number. Returns std::nullopt if
 // the value is of no recognisable numeric type. Lets bindings accept both
