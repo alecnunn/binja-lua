@@ -43,9 +43,8 @@ void RegisterBasicBlockBindings(sol::state_view lua, Ref<Logger> logger) {
             return b.GetFunction();
         }),
 
-        "arch", sol::property([](BasicBlock& b) -> std::string {
-            Ref<Architecture> arch = b.GetArchitecture();
-            return arch ? arch->GetName() : "";
+        "arch", sol::property([](BasicBlock& b) -> Ref<Architecture> {
+            return b.GetArchitecture();
         }),
 
         // Boolean properties

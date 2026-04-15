@@ -18,6 +18,8 @@ longer canonical name. Each removal has a one-line replacement:
 | `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
 | `Function.arch` (string) | `Function.arch.name`    | `print(func.arch)`       | `print(func.arch.name)`         |
 | `BinaryView.arch` (string) | `BinaryView.arch.name`| `print(bv.arch)`         | `print(bv.arch.name)`           |
+| `BasicBlock.arch` (string) | `BasicBlock.arch.name`| `print(bb.arch)`         | `print(bb.arch.name)`           |
+| `Instruction.arch` (string)| `Instruction.arch.name`| `print(inst.arch)`      | `print(inst.arch.name)`         |
 | `Architecture.link_reg` (prop)      | `Architecture:link_reg()` (method)      | `arch.link_reg`              | `arch:link_reg()`              |
 | `Architecture.regs` (prop)          | `Architecture:regs()` (method)          | `arch.regs.rax`              | `arch:regs().rax`              |
 | `Architecture.full_width_regs` (prop)| `Architecture:full_width_regs()` (method)| `arch.full_width_regs`      | `arch:full_width_regs()`       |
@@ -2743,9 +2745,10 @@ Function containing this basic block
 print("In function:", bb.function.name)
 ```
 
-#### `BasicBlock.arch` -> `string`
+#### `BasicBlock.arch` -> `Architecture`
 
-Architecture name for this block
+Architecture usertype for this block. Use `.name` for the string
+form. See the Architecture section for the full read-only surface.
 
 #### `BasicBlock.can_exit` -> `boolean`
 
@@ -2952,9 +2955,10 @@ Full disassembly text including operands
 print(instr.text)  -- e.g., "mov eax, [rbp-0x8]"
 ```
 
-#### `Instruction.arch` -> `string`
+#### `Instruction.arch` -> `Architecture`
 
-Architecture of the instruction
+Architecture usertype for the instruction. Use `.name` for the
+string form.
 
 ### Methods
 
