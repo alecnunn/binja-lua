@@ -38,15 +38,7 @@ void RegisterSectionBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "type", sol::property([](Section& s) -> std::string {
-            BNSectionSemantics semantics = s.GetSemantics();
-            switch (semantics) {
-                case DefaultSectionSemantics: return "default";
-                case ReadOnlyCodeSectionSemantics: return "code";
-                case ReadOnlyDataSectionSemantics: return "data";
-                case ReadWriteDataSectionSemantics: return "data";
-                case ExternalSectionSemantics: return "external";
-                default: return "unknown";
-            }
+            return EnumToString(s.GetSemantics());
         }),
 
         // Comparison operators - must provide to prevent auto-enrollment

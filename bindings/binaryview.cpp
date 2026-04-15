@@ -811,20 +811,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
             BNAnalysisProgress progress = bv.GetAnalysisProgress();
 
-            // Convert state to string
-            std::string stateStr;
-            switch (progress.state) {
-                case InitialState: stateStr = "initial"; break;
-                case HoldState: stateStr = "hold"; break;
-                case IdleState: stateStr = "idle"; break;
-                case DiscoveryState: stateStr = "discovery"; break;
-                case DisassembleState: stateStr = "disassemble"; break;
-                case AnalyzeState: stateStr = "analyze"; break;
-                case ExtendedAnalyzeState: stateStr = "extended_analyze"; break;
-                default: stateStr = "unknown"; break;
-            }
-
-            result["state"] = stateStr;
+            result["state"] = EnumToString(progress.state);
             result["count"] = static_cast<int64_t>(progress.count);
             result["total"] = static_cast<int64_t>(progress.total);
 

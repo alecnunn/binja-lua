@@ -17,21 +17,6 @@ static BNBranchType StringToBranchType(const std::string& type) {
     return UnconditionalBranch;
 }
 
-// Helper to convert branch type enum to string
-static std::string BranchTypeToString(BNBranchType type) {
-    switch (type) {
-        case UnconditionalBranch: return "unconditional";
-        case FalseBranch: return "false";
-        case TrueBranch: return "true";
-        case CallDestination: return "call";
-        case FunctionReturn: return "return";
-        case SystemCall: return "syscall";
-        case IndirectBranch: return "indirect";
-        case ExceptionBranch: return "exception";
-        default: return "unknown";
-    }
-}
-
 void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("Registering FlowGraph bindings");
 
@@ -136,7 +121,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             const std::vector<FlowGraphEdge>& edges = node.GetOutgoingEdges();
             for (size_t i = 0; i < edges.size(); i++) {
                 sol::table edge = lua.create_table();
-                edge["type"] = BranchTypeToString(edges[i].type);
+                edge["type"] = EnumToString(edges[i].type);
                 edge["target"] = edges[i].target;
                 edge["back_edge"] = edges[i].backEdge;
 
@@ -161,7 +146,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             const std::vector<FlowGraphEdge>& edges = node.GetIncomingEdges();
             for (size_t i = 0; i < edges.size(); i++) {
                 sol::table edge = lua.create_table();
-                edge["type"] = BranchTypeToString(edges[i].type);
+                edge["type"] = EnumToString(edges[i].type);
                 edge["target"] = edges[i].target;
                 edge["back_edge"] = edges[i].backEdge;
                 result[i + 1] = edge;

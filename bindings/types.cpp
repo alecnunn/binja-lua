@@ -4,26 +4,6 @@
 
 namespace BinjaLua {
 
-// Helper to convert BNTypeClass to string
-static std::string TypeClassToString(BNTypeClass tc) {
-    switch (tc) {
-        case VoidTypeClass: return "Void";
-        case BoolTypeClass: return "Bool";
-        case IntegerTypeClass: return "Integer";
-        case FloatTypeClass: return "Float";
-        case StructureTypeClass: return "Structure";
-        case EnumerationTypeClass: return "Enumeration";
-        case PointerTypeClass: return "Pointer";
-        case ArrayTypeClass: return "Array";
-        case FunctionTypeClass: return "Function";
-        case VarArgsTypeClass: return "VarArgs";
-        case ValueTypeClass: return "Value";
-        case NamedTypeReferenceClass: return "NamedTypeReference";
-        case WideCharTypeClass: return "WideChar";
-        default: return "Unknown";
-    }
-}
-
 void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("Registering Type bindings (experimental)");
 
@@ -33,7 +13,7 @@ void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Core properties
         "type_class", sol::property([](Type& t) -> std::string {
-            return TypeClassToString(t.GetClass());
+            return EnumToString(t.GetClass());
         }),
 
         "type_class_value", sol::property([](Type& t) -> int {

@@ -95,19 +95,7 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         }),
 
         "analysis_skip_reason", sol::property([](Function& f) -> std::string {
-            BNAnalysisSkipReason reason = f.GetAnalysisSkipReason();
-            switch (reason) {
-                case NoSkipReason: return "none";
-                case AlwaysSkipReason: return "always";
-                case ExceedFunctionSizeSkipReason: return "exceed_size";
-                case ExceedFunctionAnalysisTimeSkipReason: return "exceed_time";
-                case ExceedFunctionUpdateCountSkipReason: return "exceed_updates";
-                case NewAutoFunctionAnalysisSuppressedReason: return "new_auto_suppressed";
-                case BasicAnalysisSkipReason: return "basic_analysis";
-                case IntermediateAnalysisSkipReason: return "intermediate_analysis";
-                case AnalysisPipelineSuspendedReason: return "pipeline_suspended";
-                default: return "unknown";
-            }
+            return EnumToString(f.GetAnalysisSkipReason());
         }),
 
         "can_return", sol::property([](Function& f) -> bool {

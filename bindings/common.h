@@ -123,6 +123,134 @@ sol::table ToLuaTable(sol::this_state ts, const std::vector<T>& items) {
                       [](const T& item) -> const T& { return item; });
 }
 
+// Enum-to-string helpers. Vocabularies follow the strings already in use
+// across the bindings; consolidating them here lets new call sites drop a
+// single helper in place instead of re-writing per-enum switch blocks.
+
+inline const char* EnumToString(BNBranchType type) {
+    switch (type) {
+        case UnconditionalBranch: return "unconditional";
+        case FalseBranch:         return "false";
+        case TrueBranch:          return "true";
+        case CallDestination:     return "call";
+        case FunctionReturn:      return "return";
+        case SystemCall:          return "syscall";
+        case IndirectBranch:      return "indirect";
+        case ExceptionBranch:     return "exception";
+        case UnresolvedBranch:    return "unresolved";
+        case UserDefinedBranch:   return "user_defined";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNSymbolType type) {
+    switch (type) {
+        case FunctionSymbol:         return "Function";
+        case ImportAddressSymbol:    return "ImportAddress";
+        case ImportedFunctionSymbol: return "ImportedFunction";
+        case DataSymbol:             return "Data";
+        case ImportedDataSymbol:     return "ImportedData";
+        case ExternalSymbol:         return "External";
+        case LibraryFunctionSymbol:  return "LibraryFunction";
+        case SymbolicFunctionSymbol: return "SymbolicFunction";
+        case LocalLabelSymbol:       return "LocalLabel";
+    }
+    return "Unknown";
+}
+
+inline const char* EnumToString(BNSectionSemantics semantics) {
+    switch (semantics) {
+        case DefaultSectionSemantics:       return "default";
+        case ReadOnlyCodeSectionSemantics:  return "code";
+        case ReadOnlyDataSectionSemantics:  return "ro_data";
+        case ReadWriteDataSectionSemantics: return "rw_data";
+        case ExternalSectionSemantics:      return "external";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNTypeClass tc) {
+    switch (tc) {
+        case VoidTypeClass:               return "Void";
+        case BoolTypeClass:               return "Bool";
+        case IntegerTypeClass:            return "Integer";
+        case FloatTypeClass:              return "Float";
+        case StructureTypeClass:          return "Structure";
+        case EnumerationTypeClass:        return "Enumeration";
+        case PointerTypeClass:            return "Pointer";
+        case ArrayTypeClass:              return "Array";
+        case FunctionTypeClass:           return "Function";
+        case VarArgsTypeClass:            return "VarArgs";
+        case ValueTypeClass:              return "Value";
+        case NamedTypeReferenceClass:     return "NamedTypeReference";
+        case WideCharTypeClass:           return "WideChar";
+    }
+    return "Unknown";
+}
+
+inline const char* EnumToString(BNAnalysisState state) {
+    switch (state) {
+        case InitialState:         return "initial";
+        case HoldState:            return "hold";
+        case IdleState:            return "idle";
+        case DiscoveryState:       return "discovery";
+        case DisassembleState:     return "disassemble";
+        case AnalyzeState:         return "analyze";
+        case ExtendedAnalyzeState: return "extended_analyze";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNAnalysisSkipReason reason) {
+    switch (reason) {
+        case NoSkipReason:                            return "none";
+        case AlwaysSkipReason:                        return "always";
+        case ExceedFunctionSizeSkipReason:            return "exceed_size";
+        case ExceedFunctionAnalysisTimeSkipReason:    return "exceed_time";
+        case ExceedFunctionUpdateCountSkipReason:     return "exceed_updates";
+        case NewAutoFunctionAnalysisSuppressedReason: return "new_auto_suppressed";
+        case BasicAnalysisSkipReason:                 return "basic_analysis";
+        case IntermediateAnalysisSkipReason:          return "intermediate_analysis";
+        case AnalysisPipelineSuspendedReason:         return "pipeline_suspended";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNMetadataType type) {
+    switch (type) {
+        case InvalidDataType:         return "invalid";
+        case BooleanDataType:         return "boolean";
+        case StringDataType:          return "string";
+        case UnsignedIntegerDataType: return "unsigned_integer";
+        case SignedIntegerDataType:   return "signed_integer";
+        case DoubleDataType:          return "double";
+        case RawDataType:             return "raw";
+        case KeyValueDataType:        return "key_value";
+        case ArrayDataType:           return "array";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNMemberAccess access) {
+    switch (access) {
+        case NoAccess:        return "none";
+        case PrivateAccess:   return "private";
+        case ProtectedAccess: return "protected";
+        case PublicAccess:    return "public";
+    }
+    return "unknown";
+}
+
+inline const char* EnumToString(BNSymbolBinding binding) {
+    switch (binding) {
+        case NoBinding:     return "none";
+        case LocalBinding:  return "local";
+        case GlobalBinding: return "global";
+        case WeakBinding:   return "weak";
+    }
+    return "unknown";
+}
+
 // Extract a uint64_t address from a Lua-side value that may be a
 // HexAddress, integer, or floating-point number. Returns std::nullopt if
 // the value is of no recognisable numeric type. Lets bindings accept both

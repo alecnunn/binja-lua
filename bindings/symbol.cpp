@@ -24,18 +24,7 @@ void RegisterSymbolBindings(sol::state_view lua, Ref<Logger> logger) {
         }),
 
         "type", sol::property([](Symbol& s) -> std::string {
-            switch (s.GetType()) {
-                case FunctionSymbol: return "Function";
-                case ImportAddressSymbol: return "ImportAddress";
-                case ImportedFunctionSymbol: return "ImportedFunction";
-                case DataSymbol: return "Data";
-                case ImportedDataSymbol: return "ImportedData";
-                case ExternalSymbol: return "External";
-                case LibraryFunctionSymbol: return "LibraryFunction";
-                case SymbolicFunctionSymbol: return "SymbolicFunction";
-                case LocalLabelSymbol: return "LocalLabel";
-                default: return "Unknown";
-            }
+            return EnumToString(s.GetType());
         }),
 
         "type_value", sol::property([](Symbol& s) -> int {
