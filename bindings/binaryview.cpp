@@ -29,9 +29,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return file ? file->GetFilename() : "<unknown>";
         }),
 
-        "arch", sol::property([](BinaryView& bv) -> std::string {
-            Ref<Architecture> arch = bv.GetDefaultArchitecture();
-            return arch ? arch->GetName() : "<unknown>";
+        "arch", sol::property([](BinaryView& bv) -> Ref<Architecture> {
+            return bv.GetDefaultArchitecture();
         }),
 
         "platform", sol::property([](BinaryView& bv) -> Ref<Platform> {

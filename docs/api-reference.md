@@ -17,6 +17,7 @@ longer canonical name. Each removal has a one-line replacement:
 | `Function.auto`        | `Function.auto_discovered`| `if func.auto then`      | `if func.auto_discovered then`  |
 | `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
 | `Function.arch` (string) | `Function.arch.name`    | `print(func.arch)`       | `print(func.arch.name)`         |
+| `BinaryView.arch` (string) | `BinaryView.arch.name`| `print(bv.arch)`         | `print(bv.arch.name)`           |
 
 `Function.arch` now returns an `Architecture` usertype (added in R4)
 instead of the architecture's name string. Existing scripts that used
@@ -952,13 +953,16 @@ Full path to the loaded binary file
 print('File:', bv.filename)
 ```
 
-#### `BinaryView.arch` -> `string`
+#### `BinaryView.arch` -> `Architecture`
 
-Architecture name (e.g., 'x86_64', 'x86', 'armv7', 'aarch64', 'thumb2')
+Default architecture usertype for this binary view. Use `.name` for
+the string form (e.g. `"x86_64"`, `"aarch64"`, `"thumb2"`). See the
+Architecture section for the full read-only surface.
 
 **Example:**
 ```lua
-print('Architecture:', bv.arch)
+print('Architecture:', bv.arch.name)
+print('Pointer size:', bv.arch.address_size)
 ```
 
 #### `BinaryView.platform` -> `Platform|nil`
