@@ -98,10 +98,12 @@ void RegisterPlatformBindings(sol::state_view lua, Ref<Logger> logger) {
             return ToLuaTable(ts, p.GetCallingConventions());
         },
 
-        // Global registers
+        // Global registers. Bound as a method (colon-call on the Lua
+        // side) rather than a property because sol2 3.3.0 crashes on
+        // MSVC when sol::property is combined with sol::this_state.
+        // Same workaround as task #12 / task #14.
 
-        "global_regs", sol::property([](sol::this_state ts, Platform& p)
-                                          -> sol::table {
+        "global_regs", [](sol::this_state ts, Platform& p) -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> regs = p.GetGlobalRegisters();
             Ref<Architecture> arch = p.GetArchitecture();
@@ -114,7 +116,7 @@ void RegisterPlatformBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[idx++] = name;
             }
             return out;
-        }),
+        },
 
         "get_global_register_type", [](Platform& p, uint32_t reg)
                                          -> Ref<Type> {
@@ -153,28 +155,26 @@ void RegisterPlatformBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         // Platform types. The four accessors here match
-        // python/platform.py:507-546. type_libraries and type_container
-        // stay deferred (see the R12 block in docs/extension-plan.md).
+        // python/platform.py:507-546 and are bound as methods for the
+        // same sol::property+sol::this_state reason as global_regs
+        // above. type_libraries and type_container stay deferred (see
+        // the R12 block in docs/extension-plan.md).
 
-        "types", sol::property([](sol::this_state ts, Platform& p)
-                                    -> sol::table {
+        "types", [](sol::this_state ts, Platform& p) -> sol::table {
             return QualifiedTypeMapToTable(sol::state_view(ts), p.GetTypes());
-        }),
+        },
 
-        "variables", sol::property([](sol::this_state ts, Platform& p)
-                                        -> sol::table {
+        "variables", [](sol::this_state ts, Platform& p) -> sol::table {
             return QualifiedTypeMapToTable(sol::state_view(ts),
                                            p.GetVariables());
-        }),
+        },
 
-        "functions", sol::property([](sol::this_state ts, Platform& p)
-                                        -> sol::table {
+        "functions", [](sol::this_state ts, Platform& p) -> sol::table {
             return QualifiedTypeMapToTable(sol::state_view(ts),
                                            p.GetFunctions());
-        }),
+        },
 
-        "system_calls", sol::property([](sol::this_state ts, Platform& p)
-                                           -> sol::table {
+        "system_calls", [](sol::this_state ts, Platform& p) -> sol::table {
             sol::state_view l(ts);
             std::map<uint32_t, QualifiedNameAndType> calls =
                 p.GetSystemCalls();
@@ -186,7 +186,7 @@ void RegisterPlatformBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[kv.first] = entry;
             }
             return out;
-        }),
+        },
 
         "get_type_by_name", [](Platform& p, const std::string& name)
                                  -> Ref<Type> {

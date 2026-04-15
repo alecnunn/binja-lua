@@ -39,11 +39,17 @@ longer canonical name. Each removal has a one-line replacement:
 | `CallingConvention.high_int_return_reg` (prop)   | `CallingConvention:high_int_return_reg()` (method)   | `cc.high_int_return_reg`   | `cc:high_int_return_reg()`   |
 | `CallingConvention.float_return_reg` (prop)      | `CallingConvention:float_return_reg()` (method)      | `cc.float_return_reg`      | `cc:float_return_reg()`      |
 | `CallingConvention.global_pointer_reg` (prop)    | `CallingConvention:global_pointer_reg()` (method)    | `cc.global_pointer_reg`    | `cc:global_pointer_reg()`    |
+| `Platform.global_regs` (prop)   | `Platform:global_regs()` (method)   | `bv.platform.global_regs`   | `bv.platform:global_regs()`   |
+| `Platform.types` (prop)         | `Platform:types()` (method)         | `bv.platform.types`         | `bv.platform:types()`         |
+| `Platform.variables` (prop)     | `Platform:variables()` (method)     | `bv.platform.variables`     | `bv.platform:variables()`     |
+| `Platform.functions` (prop)     | `Platform:functions()` (method)     | `bv.platform.functions`     | `bv.platform:functions()`     |
+| `Platform.system_calls` (prop)  | `Platform:system_calls()` (method)  | `bv.platform.system_calls`  | `bv.platform:system_calls()`  |
 
-The Architecture (task #12) and CallingConvention (task #14)
-method-form changes are forced by a sol2 3.3.0 crash on MSVC when
-`sol::property` is combined with `sol::this_state`. The affected
-accessors were rebound as methods; return value types are unchanged.
+The Architecture (task #12), CallingConvention (task #14), and
+Platform (task #15) method-form changes are forced by a sol2 3.3.0
+crash on MSVC when `sol::property` is combined with `sol::this_state`.
+The affected accessors were rebound as methods; return value types
+are unchanged.
 
 `Function.arch` now returns an `Architecture` usertype (added in R4)
 instead of the architecture's name string. Existing scripts that used
@@ -865,28 +871,35 @@ fastcall calling convention, or `nil` if unregistered.
 
 System call calling convention, or `nil` if unregistered.
 
-#### `Platform.global_regs` -> `table<string>`
+### Methods
+
+The global register catalog and the four platform-type accessors
+are bound as methods (colon-call) rather than properties. sol2
+3.3.0 on MSVC crashes when `sol::property` is combined with
+`sol::this_state`, so every accessor that needs to build a
+Lua-side table takes the method form (see tasks #12 / #14 / #15).
+Return types are unchanged from the original property-form draft.
+
+#### `Platform:global_regs()` -> `table<string>`
 
 Names of global registers for this platform.
 
-#### `Platform.types` -> `table<string, Type>`
+#### `Platform:types()` -> `table<string, Type>`
 
 Platform-specific types keyed by qualified name string.
 
-#### `Platform.variables` -> `table<string, Type>`
+#### `Platform:variables()` -> `table<string, Type>`
 
 Platform-specific variable type definitions keyed by qualified name.
 
-#### `Platform.functions` -> `table<string, Type>`
+#### `Platform:functions()` -> `table<string, Type>`
 
 Platform-specific function type definitions keyed by qualified name.
 
-#### `Platform.system_calls` -> `table<integer, {name: string, type: Type}>`
+#### `Platform:system_calls()` -> `table<integer, {name: string, type: Type}>`
 
 System call table keyed by syscall number, with each entry holding
 the syscall name and its function type.
-
-### Methods
 
 #### `Platform:calling_conventions()` -> `table<CallingConvention>`
 
