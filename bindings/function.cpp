@@ -39,6 +39,10 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             return f.GetCallingConvention().GetValue();
         }),
 
+        "platform", sol::property([](Function& f) -> Ref<Platform> {
+            return f.GetPlatform();
+        }),
+
         "comment", sol::property([](Function& f) -> std::string {
             return f.GetComment();
         }),

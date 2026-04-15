@@ -160,8 +160,10 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
             return a.CanAssemble();
         }),
 
-        // standalone_platform lands in R6 alongside the Platform usertype;
-        // exposing it here would return an opaque Ref<Platform>.
+        "standalone_platform",
+        sol::property([](Architecture& a) -> Ref<Platform> {
+            return a.GetStandalonePlatform();
+        }),
 
         // Register catalog
 

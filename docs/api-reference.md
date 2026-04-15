@@ -292,6 +292,7 @@ blocker and it can be wired onto a future `Metadata` usertype.
 - [Symbol](#symbol)
 - [Architecture](#architecture)
 - [CallingConvention](#callingconvention)
+- [Platform](#platform)
 - [BinaryView](#binaryview)
 - [Function](#function)
 - [BasicBlock](#basicblock)
@@ -555,6 +556,12 @@ register. The underlying `0xffffffff` sentinel is translated to `nil`.
 Whether this architecture implements `Assemble`. Read-only query only;
 the `Assemble` method itself is not bound.
 
+#### `Architecture.standalone_platform` -> `Platform|nil`
+
+Standalone platform synthesised for this architecture when it is not
+associated with any file-format-specific platform. See the Platform
+section for the read-only surface.
+
 #### `Architecture.regs` -> `table<string, RegisterInfo>`
 
 Register catalog keyed by register name. Each value is a table
@@ -767,6 +774,141 @@ analysis that guesses a function's calling convention.
 
 ---
 
+## Platform
+
+*Read-only view of a Binary Ninja platform (e.g. `linux-x86_64`,
+`windows-x86_64`). Obtained via `bv.platform`, `func.platform`,
+`arch.standalone_platform`, or `Platform.get_by_name`. The surface
+mirrors the Python `CorePlatform` read shape from
+`binaryninja.platform`. Write-side registration, custom platform
+subclassing, and type library / type container accessors are
+deliberately not exposed; the type library entries land in R12.*
+
+### Properties
+
+#### `Platform.name` -> `string`
+
+Platform name (e.g. `"linux-x86_64"`).
+
+#### `Platform.arch` -> `Architecture`
+
+Architecture this platform is bound to.
+
+#### `Platform.address_size` -> `integer`
+
+Pointer size in bytes.
+
+#### `Platform.default_calling_convention` -> `CallingConvention|nil`
+
+Default calling convention for this platform, or `nil` if unset.
+
+#### `Platform.cdecl_calling_convention` -> `CallingConvention|nil`
+
+cdecl calling convention, or `nil` if this platform has no cdecl
+slot registered.
+
+#### `Platform.stdcall_calling_convention` -> `CallingConvention|nil`
+
+stdcall calling convention, or `nil` if unregistered.
+
+#### `Platform.fastcall_calling_convention` -> `CallingConvention|nil`
+
+fastcall calling convention, or `nil` if unregistered.
+
+#### `Platform.system_call_convention` -> `CallingConvention|nil`
+
+System call calling convention, or `nil` if unregistered.
+
+#### `Platform.global_regs` -> `table<string>`
+
+Names of global registers for this platform.
+
+#### `Platform.types` -> `table<string, Type>`
+
+Platform-specific types keyed by qualified name string.
+
+#### `Platform.variables` -> `table<string, Type>`
+
+Platform-specific variable type definitions keyed by qualified name.
+
+#### `Platform.functions` -> `table<string, Type>`
+
+Platform-specific function type definitions keyed by qualified name.
+
+#### `Platform.system_calls` -> `table<integer, {name: string, type: Type}>`
+
+System call table keyed by syscall number, with each entry holding
+the syscall name and its function type.
+
+### Methods
+
+#### `Platform:calling_conventions()` -> `table<CallingConvention>`
+
+All calling conventions registered for this platform.
+
+#### `Platform:get_global_register_type(reg)` -> `Type|nil`
+
+Look up the declared type of a global register by register index.
+
+#### `Platform:get_related_platform(arch)` -> `Platform|nil`
+
+Return the related platform for a different architecture (e.g.
+the matching x86 platform from an x86_64 one), or `nil`.
+
+#### `Platform:related_platforms()` -> `table<Platform>`
+
+All related platforms.
+
+#### `Platform:get_associated_platform_by_address(addr)` -> `(platform, new_addr)`
+
+Return the platform that applies at a given address together with
+a possibly-adjusted address.
+
+#### `Platform:get_type_by_name(name)` -> `Type|nil`
+
+Look up a platform type by its qualified name string.
+
+#### `Platform:get_variable_by_name(name)` -> `Type|nil`
+
+Look up a platform variable type by its qualified name string.
+
+#### `Platform:get_function_by_name(name[, exact_match])` -> `Type|nil`
+
+Look up a platform function type. Defaults to a fuzzy match;
+pass `true` for exact matching.
+
+#### `Platform:get_system_call_name(n)` -> `string`
+
+Name of system call number `n`.
+
+#### `Platform:get_system_call_type(n)` -> `Type|nil`
+
+Function type of system call number `n`.
+
+### Static accessors
+
+#### `Platform.get_by_name(name)` -> `Platform|nil`
+
+Look up a platform by name.
+
+#### `Platform.list()` -> `table<Platform>`
+
+Return every registered platform.
+
+#### `Platform.list_by_arch(arch)` -> `table<Platform>`
+
+Registered platforms for the given architecture.
+
+#### `Platform.list_by_os(os)` -> `table<Platform>`
+
+Registered platforms for the given OS name (e.g. `"linux"`).
+
+#### `Platform.os_list()` -> `table<string>`
+
+All registered OS names.
+
+---
+
 ## BinaryView
 
 *Main interface for analyzing loaded binary files. Provides access to functions, memory, sections, symbols, and metadata. Available as the 'bv' magic variable.
@@ -817,6 +959,16 @@ Architecture name (e.g., 'x86_64', 'x86', 'armv7', 'aarch64', 'thumb2')
 **Example:**
 ```lua
 print('Architecture:', bv.arch)
+```
+
+#### `BinaryView.platform` -> `Platform|nil`
+
+Default platform for this binary view, or `nil` if unset. See the
+Platform section for the read-only surface.
+
+**Example:**
+```lua
+print('Platform:', bv.platform and bv.platform.name or '<none>')
 ```
 
 #### `BinaryView.entry_point` -> `HexAddress`
@@ -1783,6 +1935,11 @@ if cc then
           "int args:", #cc.int_arg_regs)
 end
 ```
+
+#### `Function.platform` -> `Platform|nil`
+
+Platform this function is analysed against, or `nil`. See the
+Platform section for the read-only surface.
 
 #### `Function.comment` -> `string`
 

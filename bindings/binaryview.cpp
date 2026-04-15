@@ -34,6 +34,10 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return arch ? arch->GetName() : "<unknown>";
         }),
 
+        "platform", sol::property([](BinaryView& bv) -> Ref<Platform> {
+            return bv.GetDefaultPlatform();
+        }),
+
         "entry_point", sol::property([](BinaryView& bv) -> HexAddress {
             return HexAddress(bv.GetEntryPoint());
         }),
