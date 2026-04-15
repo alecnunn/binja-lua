@@ -154,17 +154,10 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         // Collection methods - use method syntax: func:basic_blocks(), func:callers(), etc.
         // Note: sol::property with sol::this_state causes crashes, so these are methods
         "basic_blocks", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<BasicBlock>> blocks = f.GetBasicBlocks();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < blocks.size(); i++) {
-                result[i + 1] = blocks[i];
-            }
-            return result;
+            return ToLuaTable(ts, f.GetBasicBlocks());
         },
 
         "calls", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
             std::vector<ReferenceSource> call_sites = f.GetCallSites();
             std::vector<Ref<Function>> called;
             Ref<BinaryView> view = f.GetView();
@@ -176,11 +169,7 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
                 }
             }
 
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < called.size(); i++) {
-                result[i + 1] = called[i];
-            }
-            return result;
+            return ToLuaTable(ts, called);
         },
 
         "callers", [](sol::this_state ts, Function& f) -> sol::table {
@@ -361,8 +350,10 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         // Comment methods
-        "comment_at_address", [](Function& f, uint64_t addr) -> std::string {
-            return f.GetCommentForAddress(addr);
+        "comment_at_address", [](Function& f, sol::object addr_obj) -> std::string {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return "";
+            return f.GetCommentForAddress(*addr);
         },
 
         "set_comment", [](Function& f, const std::string& comment) -> bool {
@@ -370,8 +361,11 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             return true;
         },
 
-        "set_comment_at_address", [](Function& f, uint64_t addr, const std::string& comment) -> bool {
-            f.SetCommentForAddress(addr, comment);
+        "set_comment_at_address",
+        [](Function& f, sol::object addr_obj, const std::string& comment) -> bool {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return false;
+            f.SetCommentForAddress(*addr, comment);
             return true;
         },
 

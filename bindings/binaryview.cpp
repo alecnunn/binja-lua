@@ -5,20 +5,6 @@
 
 namespace BinjaLua {
 
-// Helper to extract uint64_t from sol::object (HexAddress or numeric)
-static std::optional<uint64_t> GetAddressFromObject(sol::object obj) {
-    if (obj.is<HexAddress>()) {
-        return obj.as<HexAddress>().value;
-    } else if (obj.is<uint64_t>()) {
-        return obj.as<uint64_t>();
-    } else if (obj.is<int64_t>()) {
-        return static_cast<uint64_t>(obj.as<int64_t>());
-    } else if (obj.is<double>()) {
-        return static_cast<uint64_t>(obj.as<double>());
-    }
-    return std::nullopt;
-}
-
 void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("Registering BinaryView bindings");
 
@@ -68,19 +54,11 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Collection methods - use method syntax: bv:functions(), bv:sections(), etc.
         // Note: sol::property with sol::this_state causes crashes, so these are methods
         "functions", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionList();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < funcs.size(); i++) result[i + 1] = funcs[i];
-            return result;
+            return ToLuaTable(ts, bv.GetAnalysisFunctionList());
         },
 
         "sections", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<Section>> sects = bv.GetSections();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < sects.size(); i++) result[i + 1] = sects[i];
-            return result;
+            return ToLuaTable(ts, bv.GetSections());
         },
 
         "strings", [](sol::this_state ts, BinaryView& bv) -> sol::table {
@@ -150,7 +128,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Lookup methods - accept both uint64_t and HexAddress
         "get_function_at", [](BinaryView& bv, sol::object addr_obj) -> Ref<Function> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return nullptr;
             return bv.GetAnalysisFunction(bv.GetDefaultPlatform(), *addr);
         },
@@ -260,7 +238,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Navigation functions - all accept HexAddress or uint64_t
         "get_next_function_start_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextFunctionStartAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -269,7 +247,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_function_start_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousFunctionStartBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -278,7 +256,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_next_basic_block_start_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextBasicBlockStartAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -287,7 +265,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_basic_block_start_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousBasicBlockStartBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -296,7 +274,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_next_data_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextDataAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -305,7 +283,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_data_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousDataBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -315,41 +293,23 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Advanced lookup functions - all accept HexAddress or uint64_t
         "get_functions_at", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionsForAddress(*addr);
-            for (size_t i = 0; i < funcs.size(); i++) {
-                result[i + 1] = funcs[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetAnalysisFunctionsForAddress(*addr));
         },
 
         "get_functions_containing", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionsContainingAddress(*addr);
-            for (size_t i = 0; i < funcs.size(); i++) {
-                result[i + 1] = funcs[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetAnalysisFunctionsContainingAddress(*addr));
         },
 
         "get_basic_blocks_starting_at", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<BasicBlock>> blocks = bv.GetBasicBlocksStartingAtAddress(*addr);
-            for (size_t i = 0; i < blocks.size(); i++) {
-                result[i + 1] = blocks[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetBasicBlocksStartingAtAddress(*addr));
         },
 
         // Search by function name
@@ -380,7 +340,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Search functions
         "find_next_data", [](BinaryView& bv, sol::object start_obj,
                             const std::string& data) -> std::optional<HexAddress> {
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return std::nullopt;
 
             DataBuffer searchData(data.data(), data.size());
@@ -396,8 +356,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
 
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
 
             DataBuffer searchData(data.data(), data.size());
@@ -417,7 +377,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "find_next_text", [](sol::this_state ts, BinaryView& bv, sol::object start_obj,
                             const std::string& pattern) -> sol::object {
             sol::state_view lua(ts);
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return sol::make_object(lua, sol::nil);
 
             // Search for the text pattern as raw bytes
@@ -436,8 +396,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
 
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
 
             DataBuffer searchData(pattern.data(), pattern.size());
@@ -460,7 +420,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "find_next_constant", [](BinaryView& bv, sol::object start_obj,
                                 uint64_t constant) -> std::optional<HexAddress> {
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return std::nullopt;
 
             uint64_t resultAddr = 0;
@@ -489,11 +449,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "get_data_refs", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<uint64_t> refs = bv.GetDataReferences(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) result[i + 1] = HexAddress(refs[i]);
-            return result;
+            return ToLuaTable(ts, bv.GetDataReferences(addr),
+                              [](uint64_t a) { return HexAddress(a); });
         },
 
         // Cross-reference "from" methods (what does this address reference?)
@@ -566,13 +523,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Tag type management
         "tag_types", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<TagType>> types = bv.GetTagTypes();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < types.size(); i++) {
-                result[i + 1] = types[i];
-            }
-            return result;
+            return ToLuaTable(ts, bv.GetTagTypes());
         },
 
         "get_tag_type", [](BinaryView& bv, const std::string& name) -> Ref<TagType> {
@@ -595,7 +546,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return result;
             Ref<Architecture> arch = bv.GetDefaultArchitecture();
             std::vector<Ref<Tag>> tags = bv.GetDataTags(*addr);
@@ -607,7 +558,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "add_tag", [](BinaryView& bv, sol::object addr_obj, Ref<Tag> tag,
                       sol::optional<bool> user) {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return;
             bool isUser = user.value_or(true);
             if (isUser) {
@@ -619,7 +570,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "remove_tag", [](BinaryView& bv, sol::object addr_obj, Ref<Tag> tag,
                          sol::optional<bool> user) {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return;
             bool isUser = user.value_or(true);
             if (isUser) {
@@ -632,7 +583,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "create_user_tag", [](BinaryView& bv, sol::object addr_obj,
                               const std::string& tagTypeName,
                               const std::string& data) -> Ref<Tag> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return nullptr;
             return bv.CreateUserDataTag(*addr, tagTypeName, data);
         },
@@ -676,8 +627,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
                                 sol::optional<bool> user_only) -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
             std::vector<TagReference> refs;
             if (user_only.has_value()) {

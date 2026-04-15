@@ -5,6 +5,8 @@
 
 #include "sol_config.h"
 
+#include <optional>
+
 namespace BinjaLua {
 
 // Metatable names - must match existing names for Lua API extension compatibility
@@ -97,6 +99,49 @@ struct HexAddress {
     bool operator>(const HexAddress& other) const { return value > other.value; }
     bool operator>=(const HexAddress& other) const { return value >= other.value; }
 };
+
+// Convert an std::vector into a 1-indexed Lua sequence table using a
+// per-element projection. The projection receives const T& and returns any
+// value sol2 can assign into a table slot (primitive, std::string, Ref<U>,
+// or another table).
+template <typename T, typename F>
+sol::table ToLuaTable(sol::this_state ts, const std::vector<T>& items,
+                      F&& project) {
+    sol::state_view lua(ts);
+    sol::table result = lua.create_table(static_cast<int>(items.size()), 0);
+    for (size_t i = 0; i < items.size(); ++i) {
+        result[i + 1] = project(items[i]);
+    }
+    return result;
+}
+
+// Convenience overload: pass items through unchanged. Matches the most
+// common "result[i + 1] = items[i];" loop.
+template <typename T>
+sol::table ToLuaTable(sol::this_state ts, const std::vector<T>& items) {
+    return ToLuaTable(ts, items,
+                      [](const T& item) -> const T& { return item; });
+}
+
+// Extract a uint64_t address from a Lua-side value that may be a
+// HexAddress, integer, or floating-point number. Returns std::nullopt if
+// the value is of no recognisable numeric type. Lets bindings accept both
+// raw integers and HexAddress usertypes interchangeably.
+inline std::optional<uint64_t> AsAddress(sol::object obj) {
+    if (obj.is<HexAddress>()) {
+        return obj.as<HexAddress>().value;
+    }
+    if (obj.is<uint64_t>()) {
+        return obj.as<uint64_t>();
+    }
+    if (obj.is<int64_t>()) {
+        return static_cast<uint64_t>(obj.as<int64_t>());
+    }
+    if (obj.is<double>()) {
+        return static_cast<uint64_t>(obj.as<double>());
+    }
+    return std::nullopt;
+}
 
 // InstructionWrapper - represents a single disassembled instruction
 // Stores token data with analysis capabilities
