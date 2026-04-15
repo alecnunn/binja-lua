@@ -18,6 +18,21 @@ longer canonical name. Each removal has a one-line replacement:
 | `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
 | `Function.arch` (string) | `Function.arch.name`    | `print(func.arch)`       | `print(func.arch.name)`         |
 | `BinaryView.arch` (string) | `BinaryView.arch.name`| `print(bv.arch)`         | `print(bv.arch.name)`           |
+| `Architecture.link_reg` (prop)      | `Architecture:link_reg()` (method)      | `arch.link_reg`              | `arch:link_reg()`              |
+| `Architecture.regs` (prop)          | `Architecture:regs()` (method)          | `arch.regs.rax`              | `arch:regs().rax`              |
+| `Architecture.full_width_regs` (prop)| `Architecture:full_width_regs()` (method)| `arch.full_width_regs`      | `arch:full_width_regs()`       |
+| `Architecture.global_regs` (prop)   | `Architecture:global_regs()` (method)   | `arch.global_regs`           | `arch:global_regs()`           |
+| `Architecture.system_regs` (prop)   | `Architecture:system_regs()` (method)   | `arch.system_regs`           | `arch:system_regs()`           |
+| `Architecture.flags` (prop)         | `Architecture:flags()` (method)         | `arch.flags`                 | `arch:flags()`                 |
+| `Architecture.flag_write_types` (prop)| `Architecture:flag_write_types()` (method)| `arch.flag_write_types`     | `arch:flag_write_types()`      |
+| `Architecture.semantic_flag_classes` (prop)| `Architecture:semantic_flag_classes()` (method)| `arch.semantic_flag_classes`| `arch:semantic_flag_classes()`|
+| `Architecture.semantic_flag_groups` (prop) | `Architecture:semantic_flag_groups()` (method) | `arch.semantic_flag_groups` | `arch:semantic_flag_groups()` |
+| `Architecture.flag_roles` (prop)    | `Architecture:flag_roles()` (method)    | `arch.flag_roles.z`          | `arch:flag_roles().z`          |
+
+The Architecture method-form changes (task #12) are forced by a sol2
+3.3.0 crash on MSVC when `sol::property` is combined with
+`sol::this_state`. The affected accessors were rebound as methods;
+return value types are unchanged.
 
 `Function.arch` now returns an `Architecture` usertype (added in R4)
 instead of the architecture's name string. Existing scripts that used
@@ -547,11 +562,6 @@ Number of opcode bytes displayed per line in disassembly.
 
 Name of the stack pointer register, or the empty string if unset.
 
-#### `Architecture.link_reg` -> `string|nil`
-
-Name of the link register, or `nil` if this architecture has no link
-register. The underlying `0xffffffff` sentinel is translated to `nil`.
-
 #### `Architecture.can_assemble` -> `boolean`
 
 Whether this architecture implements `Assemble`. Read-only query only;
@@ -563,7 +573,21 @@ Standalone platform synthesised for this architecture when it is not
 associated with any file-format-specific platform. See the Platform
 section for the read-only surface.
 
-#### `Architecture.regs` -> `table<string, RegisterInfo>`
+### Methods
+
+The register catalog, register/flag name lists, and `link_reg` are
+bound as methods (colon-call) rather than properties. sol2 3.3.0 on
+MSVC crashes when `sol::property` is combined with `sol::this_state`
+(the handle required to build a Lua-side table), so every accessor
+that needs to return a table takes the method form. Return types are
+unchanged from the original property-form draft.
+
+#### `Architecture:link_reg()` -> `string|nil`
+
+Name of the link register, or `nil` if this architecture has no link
+register. The underlying `0xffffffff` sentinel is translated to `nil`.
+
+#### `Architecture:regs()` -> `table<string, RegisterInfo>`
 
 Register catalog keyed by register name. Each value is a table
 `{full_width_reg, size, offset, extend, index}`. `extend` uses the
@@ -573,44 +597,43 @@ short canonical string form from
 **Example:**
 ```lua
 local arch = Architecture.get_by_name("x86_64")
-print(arch.regs.rax.size, arch.regs.rax.full_width_reg)
+local regs = arch:regs()
+print(regs.rax.size, regs.rax.full_width_reg)
 ```
 
-#### `Architecture.full_width_regs` -> `table<string>`
+#### `Architecture:full_width_regs()` -> `table<string>`
 
 Names of full-width registers.
 
-#### `Architecture.global_regs` -> `table<string>`
+#### `Architecture:global_regs()` -> `table<string>`
 
 Names of global registers.
 
-#### `Architecture.system_regs` -> `table<string>`
+#### `Architecture:system_regs()` -> `table<string>`
 
 Names of system registers.
 
-#### `Architecture.flags` -> `table<string>`
+#### `Architecture:flags()` -> `table<string>`
 
 Names of all CPU flags.
 
-#### `Architecture.flag_write_types` -> `table<string>`
+#### `Architecture:flag_write_types()` -> `table<string>`
 
 Names of flag write-type groups. Name list only; the write-type LLIL
 emission surface is not exposed.
 
-#### `Architecture.semantic_flag_classes` -> `table<string>`
+#### `Architecture:semantic_flag_classes()` -> `table<string>`
 
 Names of semantic flag classes.
 
-#### `Architecture.semantic_flag_groups` -> `table<string>`
+#### `Architecture:semantic_flag_groups()` -> `table<string>`
 
 Names of semantic flag groups.
 
-#### `Architecture.flag_roles` -> `table<string, string>`
+#### `Architecture:flag_roles()` -> `table<string, string>`
 
-Eager dict mapping flag name to role string. See
+Dict mapping flag name to role string. See
 [BNFlagRole](#bnflagrole) for the role vocabulary.
-
-### Methods
 
 #### `Architecture:get_reg_index(name)` -> `integer`
 

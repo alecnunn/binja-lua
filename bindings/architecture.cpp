@@ -151,10 +151,16 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
             return a.GetRegisterName(a.GetStackPointerRegister());
         }),
 
-        "link_reg", sol::property([](sol::this_state ts, Architecture& a)
-                                      -> sol::object {
+        // sol::property with sol::this_state is known to crash sol2 3.3.0
+        // under MSVC (see bindings/binaryview.cpp:45 note, confirmed by
+        // the task #12 repro). Every accessor below that needs the Lua
+        // state to build a table is therefore bound as a plain method
+        // (colon-call on the Lua side) instead of a property. link_reg
+        // is a method too for consistency with the table accessors.
+
+        "link_reg", [](sol::this_state ts, Architecture& a) -> sol::object {
             return RegisterNameOrNil(ts, a, a.GetLinkRegister());
-        }),
+        },
 
         "can_assemble", sol::property([](Architecture& a) -> bool {
             return a.CanAssemble();
@@ -165,10 +171,9 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
             return a.GetStandalonePlatform();
         }),
 
-        // Register catalog
+        // Register catalog (bound as methods per the note above)
 
-        "regs", sol::property([](sol::this_state ts, Architecture& a)
-                                  -> sol::table {
+        "regs", [](sol::this_state ts, Architecture& a) -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> regs = a.GetAllRegisters();
             sol::table out = l.create_table(0, static_cast<int>(regs.size()));
@@ -178,25 +183,23 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[name] = RegisterInfoToTable(l, a, reg);
             }
             return out;
-        }),
+        },
 
-        "full_width_regs", sol::property([](sol::this_state ts,
-                                             Architecture& a) -> sol::table {
+        "full_width_regs", [](sol::this_state ts, Architecture& a)
+                                -> sol::table {
             return RegisterNamesToTable(sol::state_view(ts), a,
                                         a.GetFullWidthRegisters());
-        }),
+        },
 
-        "global_regs", sol::property([](sol::this_state ts, Architecture& a)
-                                         -> sol::table {
+        "global_regs", [](sol::this_state ts, Architecture& a) -> sol::table {
             return RegisterNamesToTable(sol::state_view(ts), a,
                                         a.GetGlobalRegisters());
-        }),
+        },
 
-        "system_regs", sol::property([](sol::this_state ts, Architecture& a)
-                                         -> sol::table {
+        "system_regs", [](sol::this_state ts, Architecture& a) -> sol::table {
             return RegisterNamesToTable(sol::state_view(ts), a,
                                         a.GetSystemRegisters());
-        }),
+        },
 
         "get_reg_index", [](Architecture& a, const std::string& name)
                              -> uint32_t {
@@ -207,10 +210,9 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
             return a.GetRegisterName(index);
         },
 
-        // Flags
+        // Flags (bound as methods per the note above)
 
-        "flags", sol::property([](sol::this_state ts, Architecture& a)
-                                   -> sol::table {
+        "flags", [](sol::this_state ts, Architecture& a) -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> flags = a.GetAllFlags();
             sol::table out = l.create_table(static_cast<int>(flags.size()), 0);
@@ -221,10 +223,10 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[idx++] = name;
             }
             return out;
-        }),
+        },
 
-        "flag_write_types", sol::property([](sol::this_state ts,
-                                              Architecture& a) -> sol::table {
+        "flag_write_types", [](sol::this_state ts, Architecture& a)
+                                 -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> types = a.GetAllFlagWriteTypes();
             sol::table out = l.create_table(static_cast<int>(types.size()), 0);
@@ -235,11 +237,10 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[idx++] = name;
             }
             return out;
-        }),
+        },
 
-        "semantic_flag_classes", sol::property([](sol::this_state ts,
-                                                    Architecture& a)
-                                                    -> sol::table {
+        "semantic_flag_classes", [](sol::this_state ts, Architecture& a)
+                                      -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> classes = a.GetAllSemanticFlagClasses();
             sol::table out =
@@ -251,11 +252,10 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[idx++] = name;
             }
             return out;
-        }),
+        },
 
-        "semantic_flag_groups", sol::property([](sol::this_state ts,
-                                                   Architecture& a)
-                                                   -> sol::table {
+        "semantic_flag_groups", [](sol::this_state ts, Architecture& a)
+                                     -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> groups = a.GetAllSemanticFlagGroups();
             sol::table out =
@@ -267,10 +267,9 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[idx++] = name;
             }
             return out;
-        }),
+        },
 
-        "flag_roles", sol::property([](sol::this_state ts, Architecture& a)
-                                        -> sol::table {
+        "flag_roles", [](sol::this_state ts, Architecture& a) -> sol::table {
             sol::state_view l(ts);
             std::vector<uint32_t> flags = a.GetAllFlags();
             sol::table out = l.create_table(0, static_cast<int>(flags.size()));
@@ -280,7 +279,7 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger) {
                 out[name] = EnumToString(a.GetFlagRole(flag, 0));
             }
             return out;
-        }),
+        },
 
         "get_flag_role", sol::overload(
             [](Architecture& a, const std::string& flag_name)
