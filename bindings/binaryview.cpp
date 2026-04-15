@@ -107,6 +107,45 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return result;
         },
 
+        // Symbol CRUD
+        "define_user_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.DefineUserSymbol(sym);
+        },
+
+        "define_auto_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.DefineAutoSymbol(sym);
+        },
+
+        "undefine_user_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.UndefineUserSymbol(sym);
+        },
+
+        "undefine_auto_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.UndefineAutoSymbol(sym);
+        },
+
+        "get_symbol_at", [](BinaryView& bv, sol::object addr_obj)
+            -> Ref<Symbol> {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return nullptr;
+            return bv.GetSymbolByAddress(*addr);
+        },
+
+        "get_symbols_by_name", [](sol::this_state ts, BinaryView& bv,
+                                  const std::string& name) -> sol::table {
+            return ToLuaTable(ts, bv.GetSymbolsByName(name));
+        },
+
+        "get_symbols_of_type", [](sol::this_state ts, BinaryView& bv,
+                                  const std::string& type_name) -> sol::table {
+            sol::state_view lua(ts);
+            auto type = SymbolTypeFromString(type_name);
+            if (!type) {
+                return lua.create_table();
+            }
+            return ToLuaTable(ts, bv.GetSymbolsOfType(*type));
+        },
+
         // Data variable properties
         "has_data_vars", sol::property([](BinaryView& bv) -> bool {
             return bv.HasDataVariables();

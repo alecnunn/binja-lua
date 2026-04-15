@@ -31,6 +31,26 @@ void RegisterSymbolBindings(sol::state_view lua, Ref<Logger> logger) {
             return static_cast<int>(s.GetType());
         }),
 
+        "raw_name", sol::property([](Symbol& s) -> std::string {
+            return s.GetRawName();
+        }),
+
+        "namespace_name", sol::property([](Symbol& s) -> std::string {
+            return s.GetNameSpace().GetString();
+        }),
+
+        "binding", sol::property([](Symbol& s) -> std::string {
+            return EnumToString(s.GetBinding());
+        }),
+
+        "ordinal", sol::property([](Symbol& s) -> uint64_t {
+            return s.GetOrdinal();
+        }),
+
+        "auto_defined", sol::property([](Symbol& s) -> bool {
+            return s.IsAutoDefined();
+        }),
+
         // Comparison operator to prevent auto-enrollment issues
         sol::meta_function::equal_to, [](Symbol& a, Symbol& b) -> bool {
             return Symbol::GetObject(&a) == Symbol::GetObject(&b);

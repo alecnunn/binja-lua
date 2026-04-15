@@ -158,6 +158,22 @@ inline const char* EnumToString(BNSymbolType type) {
     return "Unknown";
 }
 
+// Reverse lookup for the BNSymbolType vocabulary. Returns nullopt for
+// unrecognised input; callers decide how to surface the error.
+inline std::optional<BNSymbolType> SymbolTypeFromString(
+    const std::string& s) {
+    if (s == "Function")         return FunctionSymbol;
+    if (s == "ImportAddress")    return ImportAddressSymbol;
+    if (s == "ImportedFunction") return ImportedFunctionSymbol;
+    if (s == "Data")             return DataSymbol;
+    if (s == "ImportedData")     return ImportedDataSymbol;
+    if (s == "External")         return ExternalSymbol;
+    if (s == "LibraryFunction")  return LibraryFunctionSymbol;
+    if (s == "SymbolicFunction") return SymbolicFunctionSymbol;
+    if (s == "LocalLabel")       return LocalLabelSymbol;
+    return std::nullopt;
+}
+
 inline const char* EnumToString(BNSectionSemantics semantics) {
     switch (semantics) {
         case DefaultSectionSemantics:       return "default";
