@@ -251,6 +251,33 @@ inline const char* EnumToString(BNSymbolBinding binding) {
     return "unknown";
 }
 
+// Build a Lua table describing a ReferenceSource. Shape matches the
+// Python API's binaryninja.ReferenceSource roughly: address as a
+// HexAddress, func as the owning Function (absent when null), and arch
+// as the architecture's name (absent when null).
+inline sol::table ReferenceSourceToTable(sol::state_view lua,
+                                          const ReferenceSource& ref) {
+    sol::table t = lua.create_table(0, 3);
+    t["address"] = HexAddress(ref.addr);
+    if (ref.func) {
+        t["func"] = ref.func;
+    }
+    if (ref.arch) {
+        t["arch"] = ref.arch->GetName();
+    }
+    return t;
+}
+
+inline sol::table ReferenceSourcesToTable(
+    sol::this_state ts, const std::vector<ReferenceSource>& refs) {
+    sol::state_view lua(ts);
+    sol::table result = lua.create_table(static_cast<int>(refs.size()), 0);
+    for (size_t i = 0; i < refs.size(); ++i) {
+        result[i + 1] = ReferenceSourceToTable(lua, refs[i]);
+    }
+    return result;
+}
+
 // Extract a uint64_t address from a Lua-side value that may be a
 // HexAddress, integer, or floating-point number. Returns std::nullopt if
 // the value is of no recognisable numeric type. Lets bindings accept both

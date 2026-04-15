@@ -175,17 +175,7 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Additional cross-reference methods
         "call_sites", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> sites = f.GetCallSites();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < sites.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(sites[i].addr);
-                if (sites[i].func) entry["func"] = sites[i].func;
-                if (sites[i].arch) entry["arch"] = sites[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, f.GetCallSites());
         },
 
         "callees", [](sol::this_state ts, Function& f) -> sol::table {
@@ -235,18 +225,8 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "caller_sites", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
             Ref<BinaryView> view = f.GetView();
-            std::vector<ReferenceSource> refs = view->GetCallers(f.GetStart());
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                if (refs[i].arch) entry["arch"] = refs[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, view->GetCallers(f.GetStart()));
         },
 
         "variables", [](sol::this_state ts, Function& f) -> sol::table {

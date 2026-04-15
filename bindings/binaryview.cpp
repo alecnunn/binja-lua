@@ -436,16 +436,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "get_code_refs", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> refs = bv.GetCodeReferences(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["addr"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, bv.GetCodeReferences(addr));
         },
 
         "get_data_refs", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
@@ -483,17 +474,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Caller/callee methods
         "get_callers", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> refs = bv.GetCallers(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                if (refs[i].arch) entry["arch"] = refs[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, bv.GetCallers(addr));
         },
 
         "get_callees", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
