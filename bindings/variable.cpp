@@ -94,21 +94,13 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger) {
         "location", [](sol::this_state ts, const VariableWrapper& v) -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-
-            std::string locType;
-            if (v.bnVar.type == BNVariableSourceType::StackVariableSourceType) {
-                locType = "stack";
-            } else if (v.bnVar.type == BNVariableSourceType::RegisterVariableSourceType) {
-                locType = "register";
-            } else if (v.bnVar.type == BNVariableSourceType::FlagVariableSourceType) {
-                locType = "flag";
-            } else {
-                locType = "unknown";
-            }
-
-            result["type"] = locType;
+            // Route the BNVariableSourceType through the shared R2 helper
+            // so Variable:location().type matches the canonical vocabulary
+            // used by Variable.source_type. Pre-task-#21 this returned
+            // "stack" for BNVariableSourceType::StackVariableSourceType,
+            // diverging from the R2 short form "local".
+            result["type"] = EnumToString(v.bnVar.type);
             result["offset"] = static_cast<int64_t>(v.bnVar.storage);
-
             return result;
         },
 
