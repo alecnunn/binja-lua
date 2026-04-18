@@ -22,6 +22,8 @@ constexpr const char* SELECTION_METATABLE = "BinaryNinja.Selection";
 constexpr const char* LLIL_METATABLE = "BinaryNinja.LLIL";
 constexpr const char* MLIL_METATABLE = "BinaryNinja.MLIL";
 constexpr const char* HLIL_METATABLE = "BinaryNinja.HLIL";
+constexpr const char* LLIL_INSTRUCTION_METATABLE =
+    "BinaryNinja.LLILInstruction";
 constexpr const char* HEXADDRESS_METATABLE = "BinaryNinja.HexAddress";
 constexpr const char* DATAVARIABLE_METATABLE = "BinaryNinja.DataVariable";
 constexpr const char* TYPE_METATABLE = "BinaryNinja.Type";
@@ -31,6 +33,7 @@ constexpr const char* ARCHITECTURE_METATABLE = "BinaryNinja.Architecture";
 constexpr const char* CALLINGCONVENTION_METATABLE =
     "BinaryNinja.CallingConvention";
 constexpr const char* PLATFORM_METATABLE = "BinaryNinja.Platform";
+constexpr const char* SETTINGS_METATABLE = "BinaryNinja.Settings";
 
 // Logger key for storing in Lua registry
 constexpr const char* LOGGER_REGISTRY_KEY = "__binja_logger";
@@ -61,6 +64,8 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterSectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterSelectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterILBindings(sol::state_view lua, Ref<Logger> logger);
+void RegisterLLILInstructionBindings(sol::state_view lua,
+                                       Ref<Logger> logger);
 void RegisterHexAddressBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterDataVariableBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger);
@@ -70,6 +75,7 @@ void RegisterArchitectureBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterCallingConventionBindings(sol::state_view lua,
                                         Ref<Logger> logger);
 void RegisterPlatformBindings(sol::state_view lua, Ref<Logger> logger);
+void RegisterSettingsBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger);
 
 // Load optional Lua API extensions (lua-api/*.lua)
@@ -317,6 +323,23 @@ inline const char* EnumToString(BNTypeReferenceType ref) {
     return "unknown";
 }
 
+// BNSettingsScope is a BN_OPTIONS (bitmask) enum but every caller in the
+// binding treats it as a single scope selector. The short vocabulary
+// mirrors the Python SettingsScope member names with the "Settings"
+// prefix and "Scope" suffix stripped. Unknown/composite values fall
+// back to "unknown" - the R8 validation script covers the round-trip.
+inline const char* EnumToString(BNSettingsScope scope) {
+    switch (scope) {
+        case SettingsInvalidScope:  return "invalid";
+        case SettingsAutoScope:     return "auto";
+        case SettingsDefaultScope:  return "default";
+        case SettingsUserScope:     return "user";
+        case SettingsProjectScope:  return "project";
+        case SettingsResourceScope: return "resource";
+    }
+    return "unknown";
+}
+
 // Note: the C++ TagType::Type typedef and BN core's BNTagTypeType are
 // the same enum; TagType::GetType() returns BNTagTypeType. The R7
 // retrofit moves the previously hand-rolled switch in tag.cpp onto
@@ -559,6 +582,22 @@ EnumFromString<BNTypeReferenceType>(const std::string& s) {
         return ::IndirectTypeReferenceType;
     if (s == "unknown" || s == "UnknownTypeReferenceType")
         return ::UnknownTypeReferenceType;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNSettingsScope> EnumFromString<BNSettingsScope>(
+    const std::string& s) {
+    if (s == "invalid" || s == "SettingsInvalidScope")
+        return SettingsInvalidScope;
+    if (s == "auto" || s == "SettingsAutoScope") return SettingsAutoScope;
+    if (s == "default" || s == "SettingsDefaultScope")
+        return SettingsDefaultScope;
+    if (s == "user" || s == "SettingsUserScope") return SettingsUserScope;
+    if (s == "project" || s == "SettingsProjectScope")
+        return SettingsProjectScope;
+    if (s == "resource" || s == "SettingsResourceScope")
+        return SettingsResourceScope;
     return std::nullopt;
 }
 

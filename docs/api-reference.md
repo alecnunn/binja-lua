@@ -376,6 +376,7 @@ blocker and it can be wired onto a future `Metadata` usertype.
 - [Instruction](#instruction)
 - [Variable](#variable)
 - [Llil](#llil)
+- [LLILInstruction](#llilinstruction)
 - [Mlil](#mlil)
 - [Hlil](#hlil)
 - [FlowGraph](#flowgraph)
@@ -2225,6 +2226,33 @@ end
 
 Stack adjustment made by this function in bytes
 
+#### `Function.llil` -> `LowLevelILFunction|nil`
+
+Low Level IL representation of this function, or `nil` if LLIL is
+unavailable. Canonical property form; mirrors Python's
+`Function.llil` at `python/function.py:1000`. The `Function:get_llil()`
+method form is retained as an equivalent accessor.
+
+**Example:**
+```lua
+local llil = func.llil
+if llil then
+    print("LLIL instructions:", llil.instruction_count)
+end
+```
+
+#### `Function.mlil` -> `MediumLevelILFunction|nil`
+
+Medium Level IL representation of this function, or `nil` if MLIL is
+unavailable. Canonical property form; mirrors Python's
+`Function.mlil`. The `Function:get_mlil()` method form is retained.
+
+#### `Function.hlil` -> `HighLevelILFunction|nil`
+
+High Level IL representation of this function, or `nil` if HLIL is
+unavailable. Canonical property form; mirrors Python's
+`Function.hlil`. The `Function:get_hlil()` method form is retained.
+
 ### Methods
 
 #### `Function:basic_blocks(...)` -> `table<BasicBlock>`
@@ -3253,6 +3281,211 @@ bv:show_graph_report("LLIL Graph", graph)
 #### `Llil:create_graph_immediate(...)` -> `FlowGraph`
 
 Create a flow graph and wait for layout to complete
+
+---
+
+## LLILInstruction
+
+*Single Low Level IL instruction/expression. Returned by
+`Llil:instruction_at(i)`. The FIRST non-`Ref<T>` value-semantics
+usertype in the plugin: sol2 stores it by value and copies it freely.
+Each copy carries its own `Ref<LowLevelILFunction>` internally, so
+the wrapper's lifetime is self-contained.*
+
+Operands are projected to plain Lua values (primitives, name strings,
+nested `LLILInstruction` usertypes, or tables with a `kind`/`name`
+shape). There is no separate operand usertype — see
+`instr:detailed_operands()` below for the full vocabulary.
+
+### Properties
+
+#### `LLILInstruction.address` -> `HexAddress`
+
+Address of the underlying assembly instruction.
+
+#### `LLILInstruction.size` -> `integer`
+
+Width of the expression in bytes. Zero for control-flow / structural
+operations.
+
+#### `LLILInstruction.expr_index` -> `integer`
+
+Position in the IL function's expression list.
+
+#### `LLILInstruction.instr_index` -> `integer`
+
+Position in the IL function's top-level instruction list. Equals
+`expr_index` for top-level expressions.
+
+#### `LLILInstruction.source_operand` -> `integer`
+
+Raw decode-stream offset of the source operand. Rarely needed by
+scripts; exposed for parity with the Python API.
+
+#### `LLILInstruction.operation` -> `string`
+
+Short canonical opcode name: lowercase-with-underscores per
+`docs/il-metatable-design.md` section 4.2a. Mechanical
+`LLIL_`-strip + lowercase transform. Examples:
+
+| Opcode enumerator          | `operation` string     |
+| -------------------------- | ---------------------- |
+| `LLIL_NOP`                 | `"nop"`                |
+| `LLIL_SET_REG`             | `"set_reg"`            |
+| `LLIL_CMP_SLT`             | `"cmp_slt"`            |
+| `LLIL_CALL_STACK_ADJUST`   | `"call_stack_adjust"`  |
+| `LLIL_FCMP_UO`             | `"fcmp_uo"`            |
+| `LLIL_MEM_PHI`             | `"mem_phi"`            |
+
+Dual-accept in `EnumFromString<BNLowLevelILOperation>`: both the short
+form (`"set_reg"`) and the verbatim enumerator (`"LLIL_SET_REG"`)
+resolve to the same value. 143 enumerators total.
+
+#### `LLILInstruction.il_function` -> `LowLevelILFunction`
+
+Owning Low Level IL function. Named `il_function` rather than
+`function` because `function` is a Lua reserved word and cannot be
+used as an identifier in `instr.function`-style access. Same
+canonical-name rule as the R3d `start_addr` / `end_addr` /
+`auto_discovered` / `type_name` / `filename` renames. No alias.
+
+#### `LLILInstruction.flags` -> `integer`
+
+Raw `instr.flags` bitfield. Architecture-specific flag write set.
+
+#### `LLILInstruction.attributes` -> `integer`
+
+Raw `instr.attributes` bitfield. See `BNILInstructionAttribute`.
+
+#### `LLILInstruction.text` -> `string`
+
+Rendered instruction text — same tokens as
+`Llil:get_text(instr.instr_index)`.
+
+#### `LLILInstruction.ssa_form` -> `LLILInstruction`
+
+Instruction in SSA form. Returns an empty instruction when the IL
+function is already SSA or no SSA form is available.
+
+#### `LLILInstruction.non_ssa_form` -> `LLILInstruction`
+
+Instruction in non-SSA form.
+
+### Methods
+
+#### `LLILInstruction:operands()` -> `table`
+
+1-indexed sequence of projected operand values, matching Python's
+`instruction.operands` at `python/lowlevelil.py:725`. Each entry is
+whatever concrete Lua value the operand's type tag projects to. Use
+`detailed_operands` when you need operand names and types alongside
+the values.
+
+**Example:**
+```lua
+for _, op in ipairs(instr:operands()) do
+    -- op is a string / integer / nested LLILInstruction / table
+    print(type(op))
+end
+```
+
+#### `LLILInstruction:detailed_operands()` -> `table`
+
+1-indexed sequence of `{name, value, type}` tables, matching Python's
+`detailed_operands`. `name` is the Python-parity field name
+(`"dest"`, `"src"`, `"left"`, `"right"`, `"condition"`, `"targets"`,
+etc.). `type` is one of the short canonical type tags:
+
+| Tag                              | Lua value type                                       |
+| -------------------------------- | ---------------------------------------------------- |
+| `"int"`                          | integer                                              |
+| `"int_list"`                     | array of integers                                    |
+| `"float"`                        | number                                               |
+| `"expr"`                         | nested `LLILInstruction`                             |
+| `"expr_list"`                    | array of nested `LLILInstruction`                    |
+| `"reg"`                          | register name string; `nil` if sentinel              |
+| `"flag"`                         | flag name string; `nil` if sentinel                  |
+| `"reg_stack"`                    | register-stack name string                           |
+| `"sem_class"`                    | semantic-class name string; `nil` if unset           |
+| `"sem_group"`                    | semantic-group name string                           |
+| `"intrinsic"`                    | intrinsic name string                                |
+| `"cond"`                         | flag-condition short string (see below)              |
+| `"target_map"`                   | integer->integer table (`LLIL_JUMP_TO` targets)      |
+| `"reg_stack_adjust"`             | reg-stack-name -> integer table                      |
+| `"reg_ssa"`                      | `{reg=<name>, version=<int>}`                        |
+| `"reg_stack_ssa"`                | `{reg_stack=<name>, version=<int>}`                  |
+| `"reg_stack_ssa_dest_and_src"`   | `{reg_stack=<name>, version, source_version}`        |
+| `"flag_ssa"`                     | `{flag=<name>, version=<int>}`                       |
+| `"reg_ssa_list"`                 | array of `{reg, version}` tables                     |
+| `"reg_stack_ssa_list"`           | array of `{reg_stack, version}` tables               |
+| `"flag_ssa_list"`                | array of `{flag, version}` tables                    |
+| `"reg_or_flag_list"`             | array of `{kind="reg"\|"flag", name=<str>}` tables   |
+| `"reg_or_flag_ssa_list"`         | array of `{kind, name, version}` tables              |
+| `"constraint"`                   | `{type="constraint", repr="PossibleValueSet"}` (R9.1 stub) |
+| `"unknown"`                      | special-cased nested-expression delegation (7 sites) |
+
+The `cond` tag emits the `BNLowLevelILFlagCondition` short form:
+`"e"`, `"ne"`, `"slt"`, `"ult"`, `"sle"`, `"ule"`, `"sge"`, `"uge"`,
+`"sgt"`, `"ugt"`, `"neg"`, `"pos"`, `"o"`, `"no"`, `"fe"`, `"fne"`,
+`"flt"`, `"fle"`, `"fge"`, `"fgt"`, `"fo"`, `"fuo"` (22 values).
+
+Sentinel register id `0xffffffff` maps to `nil` on the Lua side
+wherever a register / flag / intrinsic name would otherwise appear.
+
+**Example:**
+```lua
+local d = instr:detailed_operands()
+for _, entry in ipairs(d) do
+    print(entry.name, entry.type, entry.value)
+end
+```
+
+#### `LLILInstruction:prefix_operands()` -> `table`
+
+Prefix-order flattened walk of the expression tree. Each entry is
+either a `{operation=<short>, size=<int>}` marker table that starts a
+sub-expression, or a projected operand value (primitive / name /
+nested instruction / etc.), matching Python's `prefix_operands` at
+`python/lowlevelil.py:837`.
+
+#### `LLILInstruction:traverse(cb)` -> `table`
+
+Depth-first pre-order walk. Invokes `cb(sub_instr)` at each node
+including the root. Non-`nil` callback returns accumulate into the
+returned 1-indexed table. Mirrors
+`python/lowlevelil.py:741`.
+
+**Example:**
+```lua
+local constants = instr:traverse(function(sub)
+    if sub.operation == "const" or sub.operation == "const_ptr" then
+        return sub:detailed_operands()[1].value
+    end
+end)
+```
+
+#### `LLILInstruction:ssa_instr_index()` -> `integer`
+
+Instruction index within the SSA form of the owning IL function.
+
+#### `LLILInstruction:ssa_expr_index()` -> `integer`
+
+Expression index within the SSA form of the owning IL function.
+
+#### `LLILInstruction:has_mlil()` -> `boolean`
+
+Whether an MLIL cross-mapping is available for this instruction.
+
+#### `LLILInstruction:has_mapped_mlil()` -> `boolean`
+
+Whether a mapped-MLIL cross-mapping is available for this
+instruction.
+
+### Metamethods
+
+- `__eq`: two `LLILInstruction` wrappers compare equal when their
+  owning IL function and `expr_index` match.
+- `__tostring`: formats as `"<LLILInstruction OP @0xADDR>"`.
 
 ---
 

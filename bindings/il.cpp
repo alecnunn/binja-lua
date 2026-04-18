@@ -1,6 +1,31 @@
-// Sol2 IL bindings for binja-lua (LLIL, MLIL, HLIL)
+// Sol2 IL bindings for binja-lua (LLIL, MLIL, HLIL).
+//
+// Value-usertype note (R9.1): the LLILInstruction usertype registered
+// by RegisterLLILInstructionBindings below is the FIRST non-Ref<T>
+// value-semantics usertype in this plugin. Every previous usertype
+// wraps a BN Ref<T> via sol2's unique_usertype_traits specialization
+// in bindings/sol_config.h. LowLevelILInstruction is a BN value type
+// that internally carries a Ref<LowLevelILFunction>; sol2 stores it
+// by value. Copies are cheap (pointer + two size_t) and safe. Do NOT
+// try to route LLILInstruction through the Ref<T> traits - sol2
+// handles value usertypes directly. Operands are projected to plain
+// Lua values (primitives, existing BN usertypes, nested instruction
+// usertypes, or plain Lua tables) by the helpers in
+// bindings/il_operand_conv.cpp. There are no *Operand usertypes;
+// see docs/il-metatable-design.md for the rationale.
+//
+// sol2 3.3.0 + MSVC HARD RULE: NEVER combine sol::property with
+// sol::this_state in a lambda. Every accessor that needs the Lua
+// state must be registered as a plain method (colon call on the
+// Lua side) with sol::this_state as its first PARAMETER. sol2 auto-
+// invokes zero-arg methods when accessed as properties, so from Lua
+// `instr.operands` works the same as `instr:operands()` - no
+// ergonomic cost. Same rule enforced in bindings/architecture.cpp
+// line 154, bindings/binaryview.cpp line 45, bindings/function.cpp
+// line 137, bindings/flowgraph.cpp line 102, bindings/settings.cpp.
 
 #include "common.h"
+#include "il.h"
 #include <sstream>
 
 namespace BinjaLua {
@@ -24,12 +49,20 @@ void RegisterILBindings(sol::state_view lua, Ref<Logger> logger) {
             return il.GetFunction();
         },
 
-        "instruction_at", [](sol::this_state ts, LowLevelILFunction& il, size_t index) -> sol::object {
+        // Replaces the R9.0 stub that returned {index = N}. Returns
+        // a BinaryNinja.LLILInstruction usertype registered by
+        // RegisterLLILInstructionBindings (see this file). Index
+        // out of range surfaces as nil - same contract as Python's
+        // LowLevelILFunction[i] subscript, which raises IndexError;
+        // Lua scripts check for nil.
+        "instruction_at",
+        [](sol::this_state ts, LowLevelILFunction& il, size_t index)
+            -> sol::object {
             sol::state_view lua(ts);
-            if (index >= il.GetInstructionCount()) return sol::nil;
-            sol::table result = lua.create_table();
-            result["index"] = index;
-            return result;
+            if (index >= il.GetInstructionCount()) {
+                return sol::make_object(lua, sol::lua_nil_t{});
+            }
+            return sol::make_object(lua, il[index]);
         },
 
         "get_text", [](LowLevelILFunction& il, size_t index) -> std::string {
@@ -175,6 +208,135 @@ void RegisterILBindings(sol::state_view lua, Ref<Logger> logger) {
     );
 
     if (logger) logger->LogDebug("IL bindings registered");
+}
+
+void RegisterLLILInstructionBindings(sol::state_view lua,
+                                      Ref<Logger> logger) {
+    if (logger) logger->LogDebug("Registering LLILInstruction bindings");
+
+    // First non-Ref<T> value-usertype in the plugin (see top-of-file
+    // note). sol2 stores LowLevelILInstruction by value; the
+    // internal Ref<LowLevelILFunction> pins the owning IL function
+    // for the wrapper's lifetime.
+    lua.new_usertype<LowLevelILInstruction>(LLIL_INSTRUCTION_METATABLE,
+        sol::no_constructor,
+
+        // Scalar fields straight out of the struct.
+        "size", &LowLevelILInstruction::size,
+        "expr_index", &LowLevelILInstruction::exprIndex,
+        "instr_index", &LowLevelILInstruction::instructionIndex,
+        "source_operand", &LowLevelILInstruction::sourceOperand,
+        "flags", &LowLevelILInstruction::flags,
+        "attributes", &LowLevelILInstruction::attributes,
+
+        // Address wrapped in HexAddress for consistent printing; same
+        // convention as Symbol.address and Function.start_addr.
+        "address", sol::property(
+            [](const LowLevelILInstruction& i) -> HexAddress {
+                return HexAddress(i.address);
+            }),
+
+        // Short canonical lowercase-underscore opcode name. Python
+        // parity: LLIL_SET_REG -> "set_reg". See
+        // docs/il-metatable-design.md section 4.2a.
+        "operation", sol::property(
+            [](const LowLevelILInstruction& i) -> std::string {
+                return std::string(EnumToString(i.operation));
+            }),
+
+        // Owning IL function as an existing Ref<T> usertype. Named
+        // `il_function` rather than `function` because `function` is
+        // a Lua reserved word and cannot be used as an identifier in
+        // `instr.function`-style access. Same canonical-name rule as
+        // the R3d `start_addr` / `end_addr` / `auto_discovered` /
+        // `type_name` / `filename` renames. No alias.
+        "il_function", sol::property(
+            [](const LowLevelILInstruction& i)
+                -> Ref<LowLevelILFunction> { return i.function; }),
+
+        // Operand-projection accessors. Bound as methods (not
+        // sol::property) because they take sol::this_state - combining
+        // property with this_state crashes sol2 3.3.0 on MSVC. sol2
+        // auto-invokes zero-arg methods as properties, so from the Lua
+        // side `instr.operands` still works.
+        "operands", &BuildLLILOperandsTable,
+        "detailed_operands", &BuildLLILDetailedOperandsTable,
+        "prefix_operands", &BuildLLILPrefixOperandsTable,
+
+        // SSA cross-form. Bound as sol::property so Lua scripts can
+        // dot-access them as read-only attributes (instr.ssa_form)
+        // matching Python's @property shape at
+        // python/lowlevelil.py. No sol::this_state here so the sol2
+        // 3.3.0 MSVC property+this_state landmine does not apply.
+        "ssa_form", sol::property(
+            [](const LowLevelILInstruction& i) -> LowLevelILInstruction {
+                return i.GetSSAForm();
+            }),
+        "non_ssa_form", sol::property(
+            [](const LowLevelILInstruction& i) -> LowLevelILInstruction {
+                return i.GetNonSSAForm();
+            }),
+        "ssa_instr_index",
+        [](const LowLevelILInstruction& i) -> size_t {
+            return i.GetSSAInstructionIndex();
+        },
+        "ssa_expr_index",
+        [](const LowLevelILInstruction& i) -> size_t {
+            return i.GetSSAExprIndex();
+        },
+
+        // MLIL cross-layer (available when HasMediumLevelIL).
+        "has_mlil", [](const LowLevelILInstruction& i) -> bool {
+            return i.HasMediumLevelIL();
+        },
+        "has_mapped_mlil",
+        [](const LowLevelILInstruction& i) -> bool {
+            return i.HasMappedMediumLevelIL();
+        },
+
+        // Rendered instruction text. Same path as
+        // LLILFunction:get_text(i). Bound as sol::property so Lua
+        // scripts read `instr.text` as a string (the pre-fix plain
+        // method form returned the bound Lua function on dot access,
+        // breaking 13_llil.lua's is_string assertion). No
+        // sol::this_state required, so the sol2 3.3.0 MSVC
+        // property+this_state landmine does not apply.
+        "text", sol::property(
+            [](const LowLevelILInstruction& i) -> std::string {
+                if (!i.function) return "";
+                Ref<Function> f = i.function->GetFunction();
+                if (!f) return "";
+                std::vector<InstructionTextToken> tokens;
+                if (i.function->GetInstructionText(
+                        f, f->GetArchitecture(),
+                        i.instructionIndex, tokens)) {
+                    std::ostringstream ss;
+                    for (const auto& t : tokens) ss << t.text;
+                    return ss.str();
+                }
+                return "";
+            }),
+
+        // Depth-first pre-order walker. Matches Python's
+        // LowLevelILInstruction.traverse.
+        "traverse", &TraverseLLILInstruction,
+
+        // Metamethods.
+        sol::meta_function::equal_to,
+        [](const LowLevelILInstruction& a,
+           const LowLevelILInstruction& b) -> bool {
+            return a.function.GetPtr() == b.function.GetPtr() &&
+                   a.exprIndex == b.exprIndex;
+        },
+
+        sol::meta_function::to_string,
+        [](const LowLevelILInstruction& i) -> std::string {
+            return fmt::format("<LLILInstruction {} @0x{:x}>",
+                               EnumToString(i.operation), i.address);
+        }
+    );
+
+    if (logger) logger->LogDebug("LLILInstruction bindings registered");
 }
 
 } // namespace BinjaLua

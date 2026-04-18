@@ -23,10 +23,11 @@
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 project(BinjaLua
-    VERSION 0.2.0
+    VERSION 0.3.0
     LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Fetch dependencies
 include(FetchContent)
@@ -130,11 +131,13 @@ set(BINDING_SOURCES
     bindings/function.cpp
     bindings/instruction.cpp
     bindings/platform.cpp
+    bindings/settings.cpp
     bindings/variable.cpp
     bindings/datavariable.cpp
     bindings/types.cpp
     bindings/tag.cpp
     bindings/il.cpp
+    bindings/il_operand_conv.cpp
     bindings/flowgraph.cpp
     bindings/section.cpp
     bindings/symbol.cpp

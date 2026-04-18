@@ -57,6 +57,13 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     RegisterCallingConventionBindings(lua, logger);
     RegisterPlatformBindings(lua, logger);
 
+    // 2b. Settings. Depends on BinaryView / Function as scope
+    // parameter types but uses sol::object to receive them lazily so
+    // it can register before Function / BinaryView are declared -
+    // sol2's usertype resolution is late-bound for parameters of
+    // type sol::object.
+    RegisterSettingsBindings(lua, logger);
+
     // 3. Wrapper types that may reference core types
     RegisterInstructionBindings(lua, logger);
     RegisterVariableBindings(lua, logger);
@@ -68,6 +75,9 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
 
     // 5. IL types
     RegisterILBindings(lua, logger);
+    // LLIL instruction usertype - depends on LLIL function binding
+    // above because instruction.function returns Ref<LowLevelILFunction>.
+    RegisterLLILInstructionBindings(lua, logger);
 
     // 6. Type system
     RegisterTypeBindings(lua, logger);

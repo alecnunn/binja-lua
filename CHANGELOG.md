@@ -27,6 +27,108 @@ PATCH bump signals additive-only changes.
 
 - _nothing yet_
 
+## [0.3.0] - unreleased
+
+Second release under the semver practice introduced in 0.2.0. Ships
+the R8 Settings binding, the R9.1 LLIL operand-walking wave, a C++20
+toolchain bump driven by BN header requirements, and a handful of
+documentation and helper additions. Pre-1.0 semver interprets 0.y.z
+MINOR bumps as "contains breaking changes" — `LLILFunction:instruction_at`
+now returns a live `LLILInstruction` usertype instead of the prior
+`{index = i}` table stub, so any script that reached into that stub
+will need to migrate to the new surface documented in
+`docs/api-reference.md`.
+
+### Added
+
+- **R9.1: `Function.llil` / `.mlil` / `.hlil` properties.** New
+  sol::property accessors on `BinaryNinja.Function` mirroring the
+  Python `Function.llil` / `.mlil` / `.hlil` surface at
+  `python/function.py:1000` / `:1068` / `:1148`. Return
+  `Ref<LowLevelILFunction>` / `MediumLevelILFunction` /
+  `HighLevelILFunction` or `nil` when analysis has not produced the
+  corresponding IL. The existing `f:get_llil()` / `get_mlil()` /
+  `get_hlil()` method forms are retained; Python exposes both and
+  scripts written against the R8 pre-R9 surface keep working.
+- **R9.1: `LLILInstruction` value-usertype + operand walking**
+  (new files `bindings/il_operand_conv.cpp`, `bindings/il.h`;
+  generated `bindings/il_enums.inc` and
+  `bindings/il_operands_table.inc`; `bindings/il.cpp` grows
+  `RegisterLLILInstructionBindings`). Introduces
+  `BinaryNinja.LLILInstruction` as the FIRST non-`Ref<T>`
+  value-semantics usertype in the plugin. Mirrors the Python
+  `LowLevelILInstruction` surface at `python/lowlevelil.py:316`.
+  `LLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `instr_index`,
+  `source_operand`, `operation` (short canonical string, dual-accept
+  via `EnumFromString<BNLowLevelILOperation>` for the 143
+  enumerators), `il_function` (`Ref<LowLevelILFunction>`; named
+  `il_function` rather than `function` because `function` is a Lua
+  reserved word - same rule as the R3d `start_addr` / `end_addr`
+  renames), `flags`,
+  `attributes`, `ssa_form` / `non_ssa_form` / `ssa_instr_index` /
+  `ssa_expr_index`, `has_mlil` / `has_mapped_mlil`, `text`.
+  Projection helpers: `operands` (1-indexed value list),
+  `detailed_operands` (1-indexed `{name, value, type}` tables),
+  `prefix_operands` (prefix-order flattened walk with
+  `{operation, size}` marker tables), `traverse(cb)` (depth-first
+  pre-order collector). Metamethods: `__eq` on
+  `(function, expr_index)`, `__tostring` as
+  `"<LLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 2c: `int`, `float`,
+  `expr`, `expr_list`, `int_list`, `reg`, `flag`, `reg_stack`,
+  `sem_class`, `sem_group`, `intrinsic`, `cond`, `target_map`,
+  `reg_stack_adjust`, `reg_ssa`, `reg_stack_ssa`,
+  `reg_stack_ssa_dest_and_src`, `flag_ssa`, `reg_ssa_list`,
+  `reg_stack_ssa_list`, `flag_ssa_list`, `reg_or_flag_list` and
+  `reg_or_flag_ssa_list` (discriminated `{kind, name}` entries),
+  `constraint` (R9.1 stub). `BNLowLevelILFlagCondition` (22
+  enumerators: 14 integer + 8 floating-point) round-trips via short
+  canonical strings (`"e"`, `"slt"`, `"fuo"`, ...). Sentinel register
+  id `0xffffffff` maps to nil on the Lua side. Generator at
+  `scripts/generate_il_tables.py` reads `binaryninjacore.h` +
+  `python/lowlevelil.py::ILOperations` to emit the enum vocabulary
+  and per-opcode operand spec dispatch; regeneration is manual on
+  each `binaryninja-api` submodule bump. Validation coverage in
+  `examples/validation/13_llil.lua`.
+- **R8: `Settings` binding (new file, `bindings/settings.cpp`).**
+  Introduces the `BinaryNinja.Settings` usertype and the `Settings.new`
+  static factory wrapping `Settings::Instance` at
+  `binaryninja-api/binaryninjaapi.h:19286`. Mirrors the Python
+  `binaryninja.settings.Settings` surface at `python/settings.py:31`
+  with one method per scalar kind: `get_bool` / `get_double` /
+  `get_integer` / `get_string` / `get_string_list` / `get_json` (plus
+  matching `*_with_scope` variants that return `(value, scope_string)`
+  tuples) and `set_bool` / `set_double` / `set_integer` / `set_string`
+  / `set_string_list` / `set_json`. Every accessor takes an optional
+  `resource` argument that can be a `BinaryView`, a `Function`, or
+  nil, and an optional scope argument that dual-accepts the short
+  canonical form (`"default"`, `"user"`, `"project"`, `"resource"`,
+  `"auto"`, `"invalid"`) OR the verbatim `BNSettingsScope` enumerator
+  name (e.g. `"SettingsUserScope"`). Schema-side: `contains`, `keys`,
+  `is_empty`, `query_property_string`, `query_property_string_list`,
+  `register_group`, `register_setting`, `update_property`,
+  `deserialize_schema`, `serialize_schema`. Persistence:
+  `serialize_settings`, `deserialize_settings`, `reset`, `reset_all`,
+  `load_settings_file`, `set_resource_id`. Adds `SETTINGS_METATABLE`
+  in `bindings/common.h` and `EnumToString` /
+  `EnumFromString<BNSettingsScope>` specializations alongside the
+  existing R2 enum helpers. Validation coverage in
+  `examples/validation/12_settings.lua` (suite: 12 scripts).
+
+### Changed
+
+- _nothing yet_
+
+### Fixed
+
+- _nothing yet_
+
+### Removed
+
+- _nothing yet_
+
 ## [0.2.0] - unreleased
 
 First release under the new semver practice. Captures every
@@ -280,7 +382,8 @@ base to compare against.
 
 - Initial public release.
 
-[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alecnunn/binja-lua/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/alecnunn/binja-lua/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alecnunn/binja-lua/releases/tag/v0.1.0
