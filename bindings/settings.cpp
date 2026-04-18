@@ -499,7 +499,22 @@ void RegisterSettingsBindings(sol::state_view lua, Ref<Logger> logger) {
         // Metamethods.
 
         sol::meta_function::equal_to, [](Settings& a, Settings& b) -> bool {
-            return Settings::GetObject(&a) == Settings::GetObject(&b);
+            // Two Settings handles are logically equal when they point
+            // at the same schema. BN caches Settings::Instance("") /
+            // Settings::Instance("default") as a singleton
+            // (binaryninja-api/settings.cpp:23-26), so raw pointer
+            // equality happens to match for the default schema, but
+            // every named schema builds a fresh instance per call.
+            // Fall back to comparing SerializeSchema() strings: same
+            // instance_id -> same schema contents -> equal. This is
+            // stronger than Python's __eq__ at python/settings.py:150
+            // (which only checks handle address) and makes the common
+            // idiom `Settings.new("my_plugin") == Settings.new("my_plugin")`
+            // work regardless of singleton caching.
+            if (Settings::GetObject(&a) == Settings::GetObject(&b)) {
+                return true;
+            }
+            return a.SerializeSchema() == b.SerializeSchema();
         },
 
         sol::meta_function::to_string, [](Settings& s) -> std::string {
