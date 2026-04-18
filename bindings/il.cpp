@@ -244,8 +244,13 @@ void RegisterLLILInstructionBindings(sol::state_view lua,
                 return std::string(EnumToString(i.operation));
             }),
 
-        // Owning IL function as an existing Ref<T> usertype.
-        "function", sol::property(
+        // Owning IL function as an existing Ref<T> usertype. Named
+        // `il_function` rather than `function` because `function` is
+        // a Lua reserved word and cannot be used as an identifier in
+        // `instr.function`-style access. Same canonical-name rule as
+        // the R3d `start_addr` / `end_addr` / `auto_discovered` /
+        // `type_name` / `filename` renames. No alias.
+        "il_function", sol::property(
             [](const LowLevelILInstruction& i)
                 -> Ref<LowLevelILFunction> { return i.function; }),
 

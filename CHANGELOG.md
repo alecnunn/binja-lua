@@ -26,7 +26,10 @@ PATCH bump signals additive-only changes.
   `address` (HexAddress), `size`, `expr_index`, `instr_index`,
   `source_operand`, `operation` (short canonical string, dual-accept
   via `EnumFromString<BNLowLevelILOperation>` for the 143
-  enumerators), `function` (`Ref<LowLevelILFunction>`), `flags`,
+  enumerators), `il_function` (`Ref<LowLevelILFunction>`; named
+  `il_function` rather than `function` because `function` is a Lua
+  reserved word - same rule as the R3d `start_addr` / `end_addr`
+  renames), `flags`,
   `attributes`, `ssa_form` / `non_ssa_form` / `ssa_instr_index` /
   `ssa_expr_index`, `has_mlil` / `has_mapped_mlil`, `text`.
   Projection helpers: `operands` (1-indexed value list),
