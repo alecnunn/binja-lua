@@ -75,6 +75,9 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
 
     // 5. IL types
     RegisterILBindings(lua, logger);
+    // LLIL instruction usertype - depends on LLIL function binding
+    // above because instruction.function returns Ref<LowLevelILFunction>.
+    RegisterLLILInstructionBindings(lua, logger);
 
     // 6. Type system
     RegisterTypeBindings(lua, logger);

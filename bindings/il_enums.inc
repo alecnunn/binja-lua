@@ -24,7 +24,7 @@
 
 // ---- BNLowLevelILOperation ----
 
-inline const char* EnumToString(BNLowLevelILOperation v) {
+const char* EnumToString(BNLowLevelILOperation v) {
     switch (v) {
         case LLIL_NOP: return "nop";
         case LLIL_SET_REG: return "set_reg";
@@ -174,7 +174,7 @@ inline const char* EnumToString(BNLowLevelILOperation v) {
 }
 
 template <>
-inline std::optional<BNLowLevelILOperation> EnumFromString<BNLowLevelILOperation>(
+std::optional<BNLowLevelILOperation> EnumFromString<BNLowLevelILOperation>(
     const std::string& s) {
     if (s == "nop" || s == "LLIL_NOP") return LLIL_NOP;
     if (s == "set_reg" || s == "LLIL_SET_REG") return LLIL_SET_REG;
@@ -324,7 +324,7 @@ inline std::optional<BNLowLevelILOperation> EnumFromString<BNLowLevelILOperation
 
 // ---- BNLowLevelILFlagCondition ----
 
-inline const char* EnumToString(BNLowLevelILFlagCondition v) {
+const char* EnumToString(BNLowLevelILFlagCondition v) {
     switch (v) {
         case LLFC_E: return "e";
         case LLFC_NE: return "ne";
@@ -353,7 +353,7 @@ inline const char* EnumToString(BNLowLevelILFlagCondition v) {
 }
 
 template <>
-inline std::optional<BNLowLevelILFlagCondition> EnumFromString<BNLowLevelILFlagCondition>(
+std::optional<BNLowLevelILFlagCondition> EnumFromString<BNLowLevelILFlagCondition>(
     const std::string& s) {
     if (s == "e" || s == "LLFC_E") return LLFC_E;
     if (s == "ne" || s == "LLFC_NE") return LLFC_NE;

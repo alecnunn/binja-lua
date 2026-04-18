@@ -101,7 +101,7 @@ def short_form(enumerator: str, prefix: str) -> str:
 def emit_enum_to_string(enum_type: str, values: Iterable[str],
                         prefix: str) -> str:
     lines: List[str] = []
-    lines.append(f"inline const char* EnumToString({enum_type} v) {{")
+    lines.append(f"const char* EnumToString({enum_type} v) {{")
     lines.append("    switch (v) {")
     for v in values:
         lines.append(f"        case {v}: return \"{short_form(v, prefix)}\";")
@@ -116,7 +116,7 @@ def emit_enum_from_string(enum_type: str, values: Iterable[str],
     lines: List[str] = []
     lines.append("template <>")
     lines.append(
-        f"inline std::optional<{enum_type}> EnumFromString<{enum_type}>("
+        f"std::optional<{enum_type}> EnumFromString<{enum_type}>("
     )
     lines.append("    const std::string& s) {")
     for v in values:

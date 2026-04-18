@@ -41,6 +41,19 @@ struct LLILOperandSpec {
     uint8_t slot_last;
 };
 
+// Declarations for the EnumToString overloads generated in
+// bindings/il_enums.inc. The .inc is included inside
+// bindings/il_operand_conv.cpp's BinjaLua namespace, so the
+// definitions live in that TU; bindings/il.cpp needs to call them to
+// render BNLowLevelILOperation and BNLowLevelILFlagCondition in the
+// LLILInstruction usertype's `operation` property and `__tostring`
+// metamethod. EnumFromString<> specializations follow the same
+// pattern and are declared here so future IL-consumer TUs can reach
+// them; template specializations in the .inc carry external linkage
+// once the declaration is visible.
+const char* EnumToString(BNLowLevelILOperation v);
+const char* EnumToString(BNLowLevelILFlagCondition v);
+
 // Per-opcode dispatch. Returns a reference to a static empty vector
 // when the opcode has no detailed_operands override in Python (e.g.
 // LLIL_NOP, LLIL_POP, LLIL_NORET, LLIL_SYSCALL, LLIL_BP, LLIL_UNDEF,

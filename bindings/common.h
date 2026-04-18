@@ -22,6 +22,8 @@ constexpr const char* SELECTION_METATABLE = "BinaryNinja.Selection";
 constexpr const char* LLIL_METATABLE = "BinaryNinja.LLIL";
 constexpr const char* MLIL_METATABLE = "BinaryNinja.MLIL";
 constexpr const char* HLIL_METATABLE = "BinaryNinja.HLIL";
+constexpr const char* LLIL_INSTRUCTION_METATABLE =
+    "BinaryNinja.LLILInstruction";
 constexpr const char* HEXADDRESS_METATABLE = "BinaryNinja.HexAddress";
 constexpr const char* DATAVARIABLE_METATABLE = "BinaryNinja.DataVariable";
 constexpr const char* TYPE_METATABLE = "BinaryNinja.Type";
@@ -62,6 +64,8 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterSectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterSelectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterILBindings(sol::state_view lua, Ref<Logger> logger);
+void RegisterLLILInstructionBindings(sol::state_view lua,
+                                       Ref<Logger> logger);
 void RegisterHexAddressBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterDataVariableBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterTypeBindings(sol::state_view lua, Ref<Logger> logger);
