@@ -55,16 +55,7 @@ void VariableWrapper::ResolveType() const {
 }
 
 std::string VariableWrapper::GetSourceTypeString() const {
-    switch (bnVar.type) {
-        case BNVariableSourceType::StackVariableSourceType:
-            return "local";
-        case BNVariableSourceType::RegisterVariableSourceType:
-            return "register";
-        case BNVariableSourceType::FlagVariableSourceType:
-            return "flag";
-        default:
-            return "unknown";
-    }
+    return EnumToString(bnVar.type);
 }
 
 std::string VariableWrapper::GetName() const {
@@ -91,11 +82,6 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger) {
             return v.GetName();
         }),
 
-        "type", sol::property([](const VariableWrapper& v) -> std::string {
-            return v.GetTypeName();
-        }),
-
-        // Alias for type (commonly used)
         "type_name", sol::property([](const VariableWrapper& v) -> std::string {
             return v.GetTypeName();
         }),
@@ -108,21 +94,13 @@ void RegisterVariableBindings(sol::state_view lua, Ref<Logger> logger) {
         "location", [](sol::this_state ts, const VariableWrapper& v) -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-
-            std::string locType;
-            if (v.bnVar.type == BNVariableSourceType::StackVariableSourceType) {
-                locType = "stack";
-            } else if (v.bnVar.type == BNVariableSourceType::RegisterVariableSourceType) {
-                locType = "register";
-            } else if (v.bnVar.type == BNVariableSourceType::FlagVariableSourceType) {
-                locType = "flag";
-            } else {
-                locType = "unknown";
-            }
-
-            result["type"] = locType;
+            // Route the BNVariableSourceType through the shared R2 helper
+            // so Variable:location().type matches the canonical vocabulary
+            // used by Variable.source_type. Pre-task-#21 this returned
+            // "stack" for BNVariableSourceType::StackVariableSourceType,
+            // diverging from the R2 short form "local".
+            result["type"] = EnumToString(v.bnVar.type);
             result["offset"] = static_cast<int64_t>(v.bnVar.storage);
-
             return result;
         },
 

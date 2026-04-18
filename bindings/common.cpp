@@ -1,7 +1,12 @@
 // Sol2 bindings common implementation for binja-lua
 
 #include "common.h"
+#include "version.h"
+#include <cfloat>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
+#include <string>
 
 namespace BinjaLua {
 
@@ -20,6 +25,12 @@ void SetLogger(sol::state_view lua, Ref<Logger> logger) {
 
 void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     if (logger) {
+        // INFO-level plugin load line per docs/versioning.md section
+        // 3.2. Keeps the version visible in the default log stream so
+        // bug reports can cite which build of the plugin was running.
+        logger->LogInfo("binja-lua %.*s loaded",
+            static_cast<int>(kVersionString.size()),
+            kVersionString.data());
         logger->LogDebug("Registering sol2 bindings...");
     }
 
@@ -38,6 +49,13 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     RegisterSectionBindings(lua, logger);
     RegisterSymbolBindings(lua, logger);
     RegisterBasicBlockBindings(lua, logger);
+
+    // 2a. Architecture / CallingConvention / Platform stack.
+    // Must come before Function so Function.arch can return a
+    // Ref<Architecture> usertype rather than a raw refcount handle.
+    RegisterArchitectureBindings(lua, logger);
+    RegisterCallingConventionBindings(lua, logger);
+    RegisterPlatformBindings(lua, logger);
 
     // 3. Wrapper types that may reference core types
     RegisterInstructionBindings(lua, logger);
@@ -71,6 +89,222 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     }
 }
 
+sol::object MetadataToLua(sol::state_view lua, BNMetadata* md) {
+    if (!md) {
+        return sol::make_object(lua, sol::nil);
+    }
+
+    BNMetadataType type = BNMetadataGetType(md);
+    switch (type) {
+        case BooleanDataType:
+            return sol::make_object(lua, BNMetadataGetBoolean(md));
+
+        case StringDataType: {
+            char* str = BNMetadataGetString(md);
+            if (!str) {
+                return sol::make_object(lua, sol::nil);
+            }
+            sol::object result = sol::make_object(lua, std::string(str));
+            BNFreeString(str);
+            return result;
+        }
+
+        case UnsignedIntegerDataType:
+            return sol::make_object(lua, BNMetadataGetUnsignedInteger(md));
+
+        case SignedIntegerDataType:
+            return sol::make_object(lua, BNMetadataGetSignedInteger(md));
+
+        case DoubleDataType:
+            return sol::make_object(lua, BNMetadataGetDouble(md));
+
+        case RawDataType: {
+            size_t size = 0;
+            uint8_t* buffer = BNMetadataGetRaw(md, &size);
+            if (!buffer) {
+                return sol::make_object(lua, std::string());
+            }
+            // Construct a Lua string from the (pointer, length) pair so
+            // embedded null bytes round-trip correctly. BNFreeMetadataRaw
+            // must be called regardless of construction success.
+            std::string raw(reinterpret_cast<const char*>(buffer), size);
+            BNFreeMetadataRaw(buffer);
+            return sol::make_object(lua, std::move(raw));
+        }
+
+        case KeyValueDataType: {
+            BNMetadataValueStore* store = BNMetadataGetValueStore(md);
+            if (!store) {
+                return sol::make_object(lua, sol::nil);
+            }
+            sol::table tbl = lua.create_table(0, static_cast<int>(store->size));
+            for (size_t i = 0; i < store->size; ++i) {
+                // Recursive decode - every nested value comes back as
+                // whatever native Lua type MetadataToLua produces.
+                tbl[store->keys[i]] = MetadataToLua(lua, store->values[i]);
+            }
+            sol::object result = sol::make_object(lua, tbl);
+            BNFreeMetadataValueStore(store);
+            return result;
+        }
+
+        case ArrayDataType: {
+            size_t size = BNMetadataSize(md);
+            sol::table tbl = lua.create_table(static_cast<int>(size), 0);
+            for (size_t i = 0; i < size; ++i) {
+                BNMetadata* element = BNMetadataGetForIndex(md, i);
+                // BNMetadataGetForIndex returns a NEW reference that the
+                // caller must free, mirroring Python metadata.py:186.
+                tbl[i + 1] = MetadataToLua(lua, element);
+                if (element) {
+                    BNFreeMetadata(element);
+                }
+            }
+            return sol::make_object(lua, tbl);
+        }
+
+        case InvalidDataType:
+        default:
+            // InvalidDataType is a sentinel in Python (metadata.py:220
+            // raises TypeError); from Lua a throw here would collapse
+            // the whole call into an error, so return nil instead and
+            // let callers decide.
+            return sol::make_object(lua, sol::nil);
+    }
+}
+
+BNMetadata* MetadataFromLua(sol::object value, bool prefer_unsigned) {
+    // Booleans must be tested before numbers; sol::is<bool> and
+    // sol::is<int64_t> both return true for a Lua bool under some sol2
+    // builds, and an accidental bool-to-integer coercion would lose
+    // type information on the way through BN.
+    if (value.is<bool>()) {
+        return BNCreateMetadataBooleanData(value.as<bool>());
+    }
+
+    if (value.is<std::string>()) {
+        // Lua strings are 8-bit clean and length-prefixed. The old
+        // code used BNCreateMetadataStringData(s.c_str()) which
+        // truncates at the first NUL, silently losing bytes for
+        // keys that carry binary payloads. Detect embedded NULs and
+        // route those through BNCreateMetadataRawData so the whole
+        // buffer survives the round trip. NUL-free strings keep
+        // StringData semantics for cross-language round-tripping
+        // with Python writers.
+        std::string s = value.as<std::string>();
+        if (s.find('\0') != std::string::npos) {
+            return BNCreateMetadataRawData(
+                reinterpret_cast<const uint8_t*>(s.data()), s.size());
+        }
+        return BNCreateMetadataStringData(s.c_str());
+    }
+
+    if (value.get_type() == sol::type::number) {
+        // Lua 5.4 distinguishes integer and float at runtime. The
+        // old code routed everything through double, which silently
+        // lost precision for integers above 2^53 (the common case
+        // for addresses and flag masks). Use lua_isinteger on the
+        // pushed value to pick the correct BN metadata type.
+        lua_State* L = value.lua_state();
+        value.push(L);
+        const bool is_integer = lua_isinteger(L, -1) != 0;
+        lua_Integer lua_int = is_integer ? lua_tointeger(L, -1) : 0;
+        const double lua_double = is_integer ? 0.0 : lua_tonumber(L, -1);
+        lua_pop(L, 1);
+
+        if (is_integer) {
+            if (prefer_unsigned && lua_int >= 0) {
+                return BNCreateMetadataUnsignedIntegerData(
+                    static_cast<uint64_t>(lua_int));
+            }
+            return BNCreateMetadataSignedIntegerData(
+                static_cast<int64_t>(lua_int));
+        }
+
+        // Float path: integer-valued floats still get signed
+        // integer encoding so a number like 0.0 or 42.0 round-trips
+        // to the same shape it had under the old codec.
+        if (lua_double == std::floor(lua_double) &&
+            lua_double >= static_cast<double>(INT64_MIN) &&
+            lua_double <= static_cast<double>(INT64_MAX)) {
+            if (prefer_unsigned && lua_double >= 0.0) {
+                return BNCreateMetadataUnsignedIntegerData(
+                    static_cast<uint64_t>(lua_double));
+            }
+            return BNCreateMetadataSignedIntegerData(
+                static_cast<int64_t>(lua_double));
+        }
+        return BNCreateMetadataDoubleData(lua_double);
+    }
+
+    if (!value.is<sol::table>()) {
+        return nullptr;
+    }
+
+    sol::table tbl = value.as<sol::table>();
+
+    // Detect 1-indexed sequential array vs string-keyed map.
+    bool is_array = true;
+    size_t expected_idx = 1;
+    for (auto& kv : tbl) {
+        if (!kv.first.is<size_t>() ||
+            kv.first.as<size_t>() != expected_idx) {
+            is_array = false;
+            break;
+        }
+        ++expected_idx;
+    }
+
+    if (is_array && expected_idx > 1) {
+        // ArrayDataType - recurse per element via BNMetadataArrayAppend.
+        // Each appended child metadata handle is owned by the array
+        // after append, so free children only on failure paths.
+        BNMetadata* array = BNCreateMetadataOfType(ArrayDataType);
+        if (!array) return nullptr;
+        for (size_t i = 1; i < expected_idx; ++i) {
+            sol::object element = tbl[i];
+            BNMetadata* child = MetadataFromLua(element, prefer_unsigned);
+            if (!child) {
+                BNFreeMetadata(array);
+                return nullptr;
+            }
+            bool ok = BNMetadataArrayAppend(array, child);
+            BNFreeMetadata(child);
+            if (!ok) {
+                BNFreeMetadata(array);
+                return nullptr;
+            }
+        }
+        return array;
+    }
+
+    // Empty tables and string-keyed tables -> KeyValueDataType.
+    // Build via BNCreateMetadataOfType + BNMetadataSetValueForKey so
+    // each value can be recursively encoded.
+    BNMetadata* store = BNCreateMetadataOfType(KeyValueDataType);
+    if (!store) return nullptr;
+    for (auto& kv : tbl) {
+        if (!kv.first.is<std::string>()) {
+            continue;
+        }
+        BNMetadata* child = MetadataFromLua(kv.second, prefer_unsigned);
+        if (!child) {
+            // Skip values we cannot encode rather than aborting the
+            // whole store - matches how the previous codec treated
+            // unrecognised scalars.
+            continue;
+        }
+        std::string key = kv.first.as<std::string>();
+        bool ok = BNMetadataSetValueForKey(store, key.c_str(), child);
+        BNFreeMetadata(child);
+        if (!ok) {
+            BNFreeMetadata(store);
+            return nullptr;
+        }
+    }
+    return store;
+}
+
 void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("Registering global functions");
 
@@ -82,6 +316,18 @@ void RegisterGlobalFunctions(sol::state_view lua, Ref<Logger> logger) {
         BNFreeString(html);
         return result;
     };
+
+    // binjalua namespace table - version source of truth on the Lua
+    // side. See docs/versioning.md section 3.3 for the spelling
+    // rationale. Four-key form: the full version string plus the
+    // three numeric components so scripts can either string-compare
+    // or component-compare without re-parsing. Build-time constant
+    // per section 3.4 (no runtime negotiation).
+    lua["binjalua"] = lua.create_table_with(
+        "version",       std::string(kVersionString),
+        "version_major", kVersionMajor,
+        "version_minor", kVersionMinor,
+        "version_patch", kVersionPatch);
 
     if (logger) logger->LogDebug("Global functions registered");
 }
@@ -180,154 +426,11 @@ void RegisterHexAddressBindings(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("HexAddress bindings registered");
 }
 
-void RegisterSelectionBindings(sol::state_view lua, Ref<Logger> logger) {
-    if (logger) logger->LogDebug("Registering Selection bindings");
-
-    lua.new_usertype<Selection>(SELECTION_METATABLE,
-        sol::constructors<Selection(), Selection(uint64_t, uint64_t)>(),
-
-        // Properties
-        "start_addr", sol::property(
-            [](const Selection& s) { return HexAddress(s.start); },
-            [](Selection& s, uint64_t v) { s.start = v; }
-        ),
-        "end_addr", sol::property(
-            [](const Selection& s) { return HexAddress(s.end); },
-            [](Selection& s, uint64_t v) { s.end = v; }
-        ),
-
-        // Methods
-        "length", &Selection::length,
-
-        // String representation
-        sol::meta_function::to_string, [](const Selection& s) {
-            return fmt::format("Selection(0x{:x}-0x{:x}, {} bytes)",
-                             s.start, s.end, s.length());
-        }
-    );
-
-    if (logger) logger->LogDebug("Selection bindings registered");
-}
-
-void RegisterSectionBindings(sol::state_view lua, Ref<Logger> logger) {
-    if (logger) logger->LogDebug("Registering Section bindings");
-
-    // Register Section type - sol2 will handle Ref<Section> via unique_usertype_traits
-    lua.new_usertype<Section>(SECTION_METATABLE,
-        sol::no_constructor,
-
-        // Properties - sol2 gives us Section& after dereferencing Ref<Section>
-        "name", sol::property([](Section& s) -> std::string {
-            return s.GetName();
-        }),
-
-        "start_addr", sol::property([](Section& s) -> HexAddress {
-            return HexAddress(s.GetStart());
-        }),
-
-        "length", sol::property([](Section& s) -> uint64_t {
-            return s.GetLength();
-        }),
-
-        // Methods
-        "permissions", [](sol::this_state ts, Section& s) -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            BNSectionSemantics semantics = s.GetSemantics();
-            bool isCode = (semantics == ReadOnlyCodeSectionSemantics);
-            bool isWritable = (semantics == ReadWriteDataSectionSemantics);
-            result["read"] = true;
-            result["write"] = isWritable;
-            result["execute"] = isCode;
-            return result;
-        },
-
-        "type", sol::property([](Section& s) -> std::string {
-            BNSectionSemantics semantics = s.GetSemantics();
-            switch (semantics) {
-                case DefaultSectionSemantics: return "default";
-                case ReadOnlyCodeSectionSemantics: return "code";
-                case ReadOnlyDataSectionSemantics: return "data";
-                case ReadWriteDataSectionSemantics: return "data";
-                case ExternalSectionSemantics: return "external";
-                default: return "unknown";
-            }
-        }),
-
-        // Comparison operators - must provide to prevent auto-enrollment
-        sol::meta_function::equal_to, [](Section& a, Section& b) -> bool {
-            // Compare by start address as a reasonable equality check
-            return Section::GetObject(&a) == Section::GetObject(&b);
-        },
-
-        // String representation
-        sol::meta_function::to_string, [](Section& s) -> std::string {
-            return fmt::format("Section({}, 0x{:x}, {} bytes)",
-                             s.GetName(), s.GetStart(), s.GetLength());
-        }
-    );
-
-    if (logger) logger->LogDebug("Section bindings registered");
-}
-
-void RegisterSymbolBindings(sol::state_view lua, Ref<Logger> logger) {
-    if (logger) logger->LogDebug("Registering Symbol bindings");
-
-    lua.new_usertype<Symbol>(SYMBOL_METATABLE,
-        sol::no_constructor,
-
-        // Properties
-        "name", sol::property([](Symbol& s) -> std::string {
-            return s.GetFullName();
-        }),
-
-        "short_name", sol::property([](Symbol& s) -> std::string {
-            return s.GetShortName();
-        }),
-
-        "address", sol::property([](Symbol& s) -> HexAddress {
-            return HexAddress(s.GetAddress());
-        }),
-
-        "type", sol::property([](Symbol& s) -> std::string {
-            switch (s.GetType()) {
-                case FunctionSymbol: return "Function";
-                case ImportAddressSymbol: return "ImportAddress";
-                case ImportedFunctionSymbol: return "ImportedFunction";
-                case DataSymbol: return "Data";
-                case ImportedDataSymbol: return "ImportedData";
-                case ExternalSymbol: return "External";
-                case LibraryFunctionSymbol: return "LibraryFunction";
-                case SymbolicFunctionSymbol: return "SymbolicFunction";
-                case LocalLabelSymbol: return "LocalLabel";
-                default: return "Unknown";
-            }
-        }),
-
-        "type_value", sol::property([](Symbol& s) -> int {
-            return static_cast<int>(s.GetType());
-        }),
-
-        // Comparison operator to prevent auto-enrollment issues
-        sol::meta_function::equal_to, [](Symbol& a, Symbol& b) -> bool {
-            return Symbol::GetObject(&a) == Symbol::GetObject(&b);
-        },
-
-        // String representation
-        sol::meta_function::to_string, [](Symbol& s) -> std::string {
-            return fmt::format("<Symbol: {} @ 0x{:x}>",
-                             s.GetShortName(), s.GetAddress());
-        }
-    );
-
-    if (logger) logger->LogDebug("Symbol bindings registered");
-}
-
+// Note: RegisterSelectionBindings implemented in selection.cpp
+// Note: RegisterSectionBindings implemented in section.cpp
+// Note: RegisterSymbolBindings implemented in symbol.cpp
 // Note: RegisterBasicBlockBindings implemented in basicblock.cpp
-
-// Placeholder implementations for remaining bindings
-// These will be filled in during subsequent migration phases
-// Note: InstructionBindings implemented in instruction.cpp
+// Note: RegisterInstructionBindings implemented in instruction.cpp
 
 // Note: RegisterVariableBindings implemented in variable.cpp
 

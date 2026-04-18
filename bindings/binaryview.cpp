@@ -5,20 +5,6 @@
 
 namespace BinjaLua {
 
-// Helper to extract uint64_t from sol::object (HexAddress or numeric)
-static std::optional<uint64_t> GetAddressFromObject(sol::object obj) {
-    if (obj.is<HexAddress>()) {
-        return obj.as<HexAddress>().value;
-    } else if (obj.is<uint64_t>()) {
-        return obj.as<uint64_t>();
-    } else if (obj.is<int64_t>()) {
-        return static_cast<uint64_t>(obj.as<int64_t>());
-    } else if (obj.is<double>()) {
-        return static_cast<uint64_t>(obj.as<double>());
-    }
-    return std::nullopt;
-}
-
 void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
     if (logger) logger->LogDebug("Registering BinaryView bindings");
 
@@ -29,16 +15,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "start_addr", sol::property([](BinaryView& bv) -> HexAddress {
             return HexAddress(bv.GetStart());
         }),
-        // Alias for start_addr
-        "start", sol::property([](BinaryView& bv) -> HexAddress {
-            return HexAddress(bv.GetStart());
-        }),
 
         "end_addr", sol::property([](BinaryView& bv) -> HexAddress {
-            return HexAddress(bv.GetEnd());
-        }),
-        // Alias for end_addr (note: "end" is a Lua keyword, use bv["end"])
-        "end", sol::property([](BinaryView& bv) -> HexAddress {
             return HexAddress(bv.GetEnd());
         }),
 
@@ -46,19 +24,17 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return bv.GetLength();
         }),
 
-        "file", sol::property([](BinaryView& bv) -> std::string {
-            Ref<FileMetadata> file = bv.GetFile();
-            return file ? file->GetFilename() : "<unknown>";
-        }),
-        // Alias for file
         "filename", sol::property([](BinaryView& bv) -> std::string {
             Ref<FileMetadata> file = bv.GetFile();
             return file ? file->GetFilename() : "<unknown>";
         }),
 
-        "arch", sol::property([](BinaryView& bv) -> std::string {
-            Ref<Architecture> arch = bv.GetDefaultArchitecture();
-            return arch ? arch->GetName() : "<unknown>";
+        "arch", sol::property([](BinaryView& bv) -> Ref<Architecture> {
+            return bv.GetDefaultArchitecture();
+        }),
+
+        "platform", sol::property([](BinaryView& bv) -> Ref<Platform> {
+            return bv.GetDefaultPlatform();
         }),
 
         "entry_point", sol::property([](BinaryView& bv) -> HexAddress {
@@ -68,19 +44,11 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Collection methods - use method syntax: bv:functions(), bv:sections(), etc.
         // Note: sol::property with sol::this_state causes crashes, so these are methods
         "functions", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionList();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < funcs.size(); i++) result[i + 1] = funcs[i];
-            return result;
+            return ToLuaTable(ts, bv.GetAnalysisFunctionList());
         },
 
         "sections", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<Section>> sects = bv.GetSections();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < sects.size(); i++) result[i + 1] = sects[i];
-            return result;
+            return ToLuaTable(ts, bv.GetSections());
         },
 
         "strings", [](sol::this_state ts, BinaryView& bv) -> sol::table {
@@ -129,6 +97,45 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             return result;
         },
 
+        // Symbol CRUD
+        "define_user_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.DefineUserSymbol(sym);
+        },
+
+        "define_auto_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.DefineAutoSymbol(sym);
+        },
+
+        "undefine_user_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.UndefineUserSymbol(sym);
+        },
+
+        "undefine_auto_symbol", [](BinaryView& bv, Ref<Symbol> sym) {
+            if (sym) bv.UndefineAutoSymbol(sym);
+        },
+
+        "get_symbol_at", [](BinaryView& bv, sol::object addr_obj)
+            -> Ref<Symbol> {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return nullptr;
+            return bv.GetSymbolByAddress(*addr);
+        },
+
+        "get_symbols_by_name", [](sol::this_state ts, BinaryView& bv,
+                                  const std::string& name) -> sol::table {
+            return ToLuaTable(ts, bv.GetSymbolsByName(name));
+        },
+
+        "get_symbols_of_type", [](sol::this_state ts, BinaryView& bv,
+                                  const std::string& type_name) -> sol::table {
+            sol::state_view lua(ts);
+            auto type = EnumFromString<BNSymbolType>(type_name);
+            if (!type) {
+                return lua.create_table();
+            }
+            return ToLuaTable(ts, bv.GetSymbolsOfType(*type));
+        },
+
         // Data variable properties
         "has_data_vars", sol::property([](BinaryView& bv) -> bool {
             return bv.HasDataVariables();
@@ -150,7 +157,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Lookup methods - accept both uint64_t and HexAddress
         "get_function_at", [](BinaryView& bv, sol::object addr_obj) -> Ref<Function> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return nullptr;
             return bv.GetAnalysisFunction(bv.GetDefaultPlatform(), *addr);
         },
@@ -260,7 +267,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Navigation functions - all accept HexAddress or uint64_t
         "get_next_function_start_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextFunctionStartAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -269,7 +276,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_function_start_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousFunctionStartBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -278,7 +285,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_next_basic_block_start_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextBasicBlockStartAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -287,7 +294,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_basic_block_start_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousBasicBlockStartBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -296,7 +303,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_next_data_after", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t nextAddr = bv.GetNextDataAfterAddress(*addr);
             if (nextAddr == 0 || nextAddr <= *addr) return std::nullopt;
@@ -305,7 +312,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "get_previous_data_before", [](BinaryView& bv, sol::object addr_obj)
             -> std::optional<HexAddress> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return std::nullopt;
             uint64_t prevAddr = bv.GetPreviousDataBeforeAddress(*addr);
             if (prevAddr == 0 || prevAddr >= *addr) return std::nullopt;
@@ -315,41 +322,23 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Advanced lookup functions - all accept HexAddress or uint64_t
         "get_functions_at", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionsForAddress(*addr);
-            for (size_t i = 0; i < funcs.size(); i++) {
-                result[i + 1] = funcs[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetAnalysisFunctionsForAddress(*addr));
         },
 
         "get_functions_containing", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<Function>> funcs = bv.GetAnalysisFunctionsContainingAddress(*addr);
-            for (size_t i = 0; i < funcs.size(); i++) {
-                result[i + 1] = funcs[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetAnalysisFunctionsContainingAddress(*addr));
         },
 
         "get_basic_blocks_starting_at", [](sol::this_state ts, BinaryView& bv, sol::object addr_obj)
             -> sol::table {
-            sol::state_view lua(ts);
-            sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
-            if (!addr) return result;
-            std::vector<Ref<BasicBlock>> blocks = bv.GetBasicBlocksStartingAtAddress(*addr);
-            for (size_t i = 0; i < blocks.size(); i++) {
-                result[i + 1] = blocks[i];
-            }
-            return result;
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return sol::state_view(ts).create_table();
+            return ToLuaTable(ts, bv.GetBasicBlocksStartingAtAddress(*addr));
         },
 
         // Search by function name
@@ -380,7 +369,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         // Search functions
         "find_next_data", [](BinaryView& bv, sol::object start_obj,
                             const std::string& data) -> std::optional<HexAddress> {
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return std::nullopt;
 
             DataBuffer searchData(data.data(), data.size());
@@ -396,8 +385,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
 
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
 
             DataBuffer searchData(data.data(), data.size());
@@ -417,7 +406,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "find_next_text", [](sol::this_state ts, BinaryView& bv, sol::object start_obj,
                             const std::string& pattern) -> sol::object {
             sol::state_view lua(ts);
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return sol::make_object(lua, sol::nil);
 
             // Search for the text pattern as raw bytes
@@ -436,8 +425,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
 
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
 
             DataBuffer searchData(pattern.data(), pattern.size());
@@ -460,7 +449,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "find_next_constant", [](BinaryView& bv, sol::object start_obj,
                                 uint64_t constant) -> std::optional<HexAddress> {
-            auto start = GetAddressFromObject(start_obj);
+            auto start = AsAddress(start_obj);
             if (!start) return std::nullopt;
 
             uint64_t resultAddr = 0;
@@ -476,24 +465,12 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "get_code_refs", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> refs = bv.GetCodeReferences(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["addr"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, bv.GetCodeReferences(addr));
         },
 
         "get_data_refs", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<uint64_t> refs = bv.GetDataReferences(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) result[i + 1] = HexAddress(refs[i]);
-            return result;
+            return ToLuaTable(ts, bv.GetDataReferences(addr),
+                              [](uint64_t a) { return HexAddress(a); });
         },
 
         // Cross-reference "from" methods (what does this address reference?)
@@ -526,17 +503,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Caller/callee methods
         "get_callers", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> refs = bv.GetCallers(addr);
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                if (refs[i].arch) entry["arch"] = refs[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, bv.GetCallers(addr));
         },
 
         "get_callees", [](sol::this_state ts, BinaryView& bv, uint64_t addr) -> sol::table {
@@ -566,17 +533,16 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Tag type management
         "tag_types", [](sol::this_state ts, BinaryView& bv) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<TagType>> types = bv.GetTagTypes();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < types.size(); i++) {
-                result[i + 1] = types[i];
-            }
-            return result;
+            return ToLuaTable(ts, bv.GetTagTypes());
         },
 
         "get_tag_type", [](BinaryView& bv, const std::string& name) -> Ref<TagType> {
             return bv.GetTagType(name);
+        },
+
+        "get_tag_type_by_id", [](BinaryView& bv, const std::string& id)
+            -> Ref<TagType> {
+            return bv.GetTagTypeById(id);
         },
 
         "create_tag_type", [](BinaryView& bv, const std::string& name,
@@ -595,7 +561,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
             -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return result;
             Ref<Architecture> arch = bv.GetDefaultArchitecture();
             std::vector<Ref<Tag>> tags = bv.GetDataTags(*addr);
@@ -607,7 +573,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "add_tag", [](BinaryView& bv, sol::object addr_obj, Ref<Tag> tag,
                       sol::optional<bool> user) {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return;
             bool isUser = user.value_or(true);
             if (isUser) {
@@ -619,7 +585,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
         "remove_tag", [](BinaryView& bv, sol::object addr_obj, Ref<Tag> tag,
                          sol::optional<bool> user) {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return;
             bool isUser = user.value_or(true);
             if (isUser) {
@@ -632,9 +598,19 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "create_user_tag", [](BinaryView& bv, sol::object addr_obj,
                               const std::string& tagTypeName,
                               const std::string& data) -> Ref<Tag> {
-            auto addr = GetAddressFromObject(addr_obj);
+            auto addr = AsAddress(addr_obj);
             if (!addr) return nullptr;
             return bv.CreateUserDataTag(*addr, tagTypeName, data);
+        },
+
+        "create_auto_tag", [](BinaryView& bv, sol::object addr_obj,
+                               const std::string& tagTypeName,
+                               const std::string& data) -> Ref<Tag> {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return nullptr;
+            Ref<TagType> tagType = bv.GetTagType(tagTypeName);
+            if (!tagType) return nullptr;
+            return bv.CreateAutoDataTag(*addr, tagType, data);
         },
 
         // Get all tags
@@ -676,8 +652,8 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
                                 sol::optional<bool> user_only) -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
-            auto start = GetAddressFromObject(start_obj);
-            auto end = GetAddressFromObject(end_obj);
+            auto start = AsAddress(start_obj);
+            auto end = AsAddress(end_obj);
             if (!start || !end) return result;
             std::vector<TagReference> refs;
             if (user_only.has_value()) {
@@ -789,16 +765,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
                 sol::table entry = lua.create_table();
                 entry["name"] = refs[i].name.GetString();
                 entry["offset"] = refs[i].offset;
-
-                // Convert type to string
-                std::string refType;
-                switch (refs[i].type) {
-                    case BNTypeReferenceType::DirectTypeReferenceType: refType = "direct"; break;
-                    case BNTypeReferenceType::IndirectTypeReferenceType: refType = "indirect"; break;
-                    default: refType = "unknown"; break;
-                }
-                entry["ref_type"] = refType;
-
+                entry["ref_type"] = EnumToString(refs[i].type);
                 result[i + 1] = entry;
             }
             return result;
@@ -860,20 +827,7 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
 
             BNAnalysisProgress progress = bv.GetAnalysisProgress();
 
-            // Convert state to string
-            std::string stateStr;
-            switch (progress.state) {
-                case InitialState: stateStr = "initial"; break;
-                case HoldState: stateStr = "hold"; break;
-                case IdleState: stateStr = "idle"; break;
-                case DiscoveryState: stateStr = "discovery"; break;
-                case DisassembleState: stateStr = "disassemble"; break;
-                case AnalyzeState: stateStr = "analyze"; break;
-                case ExtendedAnalyzeState: stateStr = "extended_analyze"; break;
-                default: stateStr = "unknown"; break;
-            }
-
-            result["state"] = stateStr;
+            result["state"] = EnumToString(progress.state);
             result["count"] = static_cast<int64_t>(progress.count);
             result["total"] = static_cast<int64_t>(progress.total);
 
@@ -888,99 +842,11 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "store_metadata", [](sol::this_state ts, BinaryView& bv,
                             const std::string& key, sol::object value,
                             sol::optional<bool> isAuto) {
-            BNMetadata* md = nullptr;
-
-            if (value.is<bool>()) {
-                md = BNCreateMetadataBooleanData(value.as<bool>());
-            } else if (value.is<std::string>()) {
-                md = BNCreateMetadataStringData(value.as<std::string>().c_str());
-            } else if (value.get_type() == sol::type::number) {
-                // Handle all numbers - check if integer or float
-                double d = value.as<double>();
-                // Check if it's actually a whole number (no fractional part)
-                if (d == std::floor(d) && d >= INT64_MIN && d <= INT64_MAX) {
-                    md = BNCreateMetadataSignedIntegerData(static_cast<int64_t>(d));
-                } else {
-                    md = BNCreateMetadataDoubleData(d);
-                }
-            } else if (value.is<sol::table>()) {
-                // Check if it's an array or a key-value table
-                sol::table tbl = value.as<sol::table>();
-                bool isArray = true;
-                size_t expectedIdx = 1;
-                for (auto& kv : tbl) {
-                    if (!kv.first.is<size_t>() || kv.first.as<size_t>() != expectedIdx) {
-                        isArray = false;
-                        break;
-                    }
-                    expectedIdx++;
-                }
-
-                if (isArray && expectedIdx > 1) {
-                    // Array of strings (most common case)
-                    std::vector<const char*> strValues;
-                    std::vector<std::string> strStorage;
-                    bool allStrings = true;
-
-                    for (auto& kv : tbl) {
-                        if (kv.second.is<std::string>()) {
-                            strStorage.push_back(kv.second.as<std::string>());
-                        } else {
-                            allStrings = false;
-                            break;
-                        }
-                    }
-
-                    if (allStrings && !strStorage.empty()) {
-                        for (const auto& s : strStorage) {
-                            strValues.push_back(s.c_str());
-                        }
-                        md = BNCreateMetadataStringListData(strValues.data(), strValues.size());
-                    }
-                } else {
-                    // Key-value store
-                    std::vector<const char*> keys;
-                    std::vector<BNMetadata*> values;
-                    std::vector<std::string> keyStorage;
-
-                    for (auto& kv : tbl) {
-                        if (kv.first.is<std::string>()) {
-                            keyStorage.push_back(kv.first.as<std::string>());
-
-                            BNMetadata* val = nullptr;
-                            if (kv.second.is<bool>()) {
-                                val = BNCreateMetadataBooleanData(kv.second.as<bool>());
-                            } else if (kv.second.is<std::string>()) {
-                                val = BNCreateMetadataStringData(
-                                    kv.second.as<std::string>().c_str());
-                            } else if (kv.second.is<int64_t>()) {
-                                val = BNCreateMetadataSignedIntegerData(kv.second.as<int64_t>());
-                            } else if (kv.second.is<double>()) {
-                                val = BNCreateMetadataDoubleData(kv.second.as<double>());
-                            }
-
-                            if (val) {
-                                values.push_back(val);
-                            }
-                        }
-                    }
-
-                    if (!keyStorage.empty() && keyStorage.size() == values.size()) {
-                        for (const auto& k : keyStorage) {
-                            keys.push_back(k.c_str());
-                        }
-                        md = BNCreateMetadataValueStore(keys.data(), values.data(), keys.size());
-                    }
-
-                    // Free intermediate metadata objects
-                    for (auto* v : values) {
-                        BNFreeMetadata(v);
-                    }
-                }
-            }
-
+            (void)ts;
+            BNMetadata* md = MetadataFromLua(value);
             if (md) {
-                BNBinaryViewStoreMetadata(BinaryView::GetObject(&bv), key.c_str(), md,
+                BNBinaryViewStoreMetadata(BinaryView::GetObject(&bv),
+                                         key.c_str(), md,
                                          isAuto.value_or(false));
                 BNFreeMetadata(md);
             }
@@ -990,73 +856,12 @@ void RegisterBinaryViewBindings(sol::state_view lua, Ref<Logger> logger) {
         "query_metadata", [](sol::this_state ts, BinaryView& bv,
                             const std::string& key) -> sol::object {
             sol::state_view lua(ts);
-
-            BNMetadata* md = BNBinaryViewQueryMetadata(BinaryView::GetObject(&bv), key.c_str());
+            BNMetadata* md = BNBinaryViewQueryMetadata(
+                BinaryView::GetObject(&bv), key.c_str());
             if (!md) {
                 return sol::make_object(lua, sol::nil);
             }
-
-            sol::object result = sol::make_object(lua, sol::nil);
-            BNMetadataType type = BNMetadataGetType(md);
-
-            switch (type) {
-                case BooleanDataType:
-                    result = sol::make_object(lua, BNMetadataGetBoolean(md));
-                    break;
-                case StringDataType: {
-                    char* str = BNMetadataGetString(md);
-                    if (str) {
-                        result = sol::make_object(lua, std::string(str));
-                        BNFreeString(str);
-                    }
-                    break;
-                }
-                case UnsignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetUnsignedInteger(md));
-                    break;
-                case SignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetSignedInteger(md));
-                    break;
-                case DoubleDataType:
-                    result = sol::make_object(lua, BNMetadataGetDouble(md));
-                    break;
-                case KeyValueDataType: {
-                    BNMetadataValueStore* store = BNMetadataGetValueStore(md);
-                    if (store) {
-                        sol::table tbl = lua.create_table();
-                        for (size_t i = 0; i < store->size; i++) {
-                            BNMetadataType vtype = BNMetadataGetType(store->values[i]);
-                            if (vtype == StringDataType) {
-                                char* str = BNMetadataGetString(store->values[i]);
-                                if (str) {
-                                    tbl[store->keys[i]] = std::string(str);
-                                    BNFreeString(str);
-                                }
-                            } else if (vtype == BooleanDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetBoolean(store->values[i]);
-                            } else if (vtype == SignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetSignedInteger(store->values[i]);
-                            } else if (vtype == UnsignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetUnsignedInteger(store->values[i]);
-                            } else if (vtype == DoubleDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetDouble(store->values[i]);
-                            }
-                        }
-                        result = sol::make_object(lua, tbl);
-                        BNFreeMetadataValueStore(store);
-                    }
-                    break;
-                }
-                default:
-                    // For arrays and other types, return as JSON string
-                    char* json = BNMetadataGetJsonString(md);
-                    if (json) {
-                        result = sol::make_object(lua, std::string(json));
-                        BNFreeString(json);
-                    }
-                    break;
-            }
-
+            sol::object result = MetadataToLua(lua, md);
             BNFreeMetadata(md);
             return result;
         },

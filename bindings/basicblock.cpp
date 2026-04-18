@@ -4,27 +4,10 @@
 
 namespace BinjaLua {
 
-// Helper to convert BNBranchType to string
-static const char* BranchTypeToString(BNBranchType type) {
-    switch (type) {
-        case UnconditionalBranch: return "unconditional";
-        case FalseBranch: return "false";
-        case TrueBranch: return "true";
-        case CallDestination: return "call";
-        case FunctionReturn: return "return";
-        case SystemCall: return "syscall";
-        case IndirectBranch: return "indirect";
-        case ExceptionBranch: return "exception";
-        case UnresolvedBranch: return "unresolved";
-        case UserDefinedBranch: return "user_defined";
-        default: return "unknown";
-    }
-}
-
 // Helper to create edge table
 static sol::table CreateEdgeTable(sol::state_view& lua, const BasicBlockEdge& edge) {
     sol::table t = lua.create_table();
-    t["type"] = BranchTypeToString(edge.type);
+    t["type"] = EnumToString(edge.type);
     t["target_addr"] = HexAddress(edge.target->GetStart());
     t["back_edge"] = edge.backEdge;
     t["fall_through"] = edge.fallThrough;
@@ -60,9 +43,8 @@ void RegisterBasicBlockBindings(sol::state_view lua, Ref<Logger> logger) {
             return b.GetFunction();
         }),
 
-        "arch", sol::property([](BasicBlock& b) -> std::string {
-            Ref<Architecture> arch = b.GetArchitecture();
-            return arch ? arch->GetName() : "";
+        "arch", sol::property([](BasicBlock& b) -> Ref<Architecture> {
+            return b.GetArchitecture();
         }),
 
         // Boolean properties

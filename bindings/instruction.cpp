@@ -137,8 +137,9 @@ void RegisterInstructionBindings(sol::state_view lua, Ref<Logger> logger) {
             return i.GetText();
         }),
 
-        "arch", sol::property([](const InstructionWrapper& i) -> std::string {
-            return i.arch ? i.arch->GetName() : "<unknown>";
+        "arch", sol::property([](const InstructionWrapper& i)
+                                   -> Ref<Architecture> {
+            return i.arch;
         }),
 
         // Methods - computed values that may do work

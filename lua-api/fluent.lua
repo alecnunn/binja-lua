@@ -212,7 +212,7 @@ function Query:auto_discovered()
     table.insert(self.steps, function(data)
         local results = {}
         for _, item in ipairs(data) do
-            if item.auto then
+            if item.auto_discovered then
                 table.insert(results, item)
             end
         end
@@ -232,7 +232,7 @@ function Query:user_defined()
     table.insert(self.steps, function(data)
         local results = {}
         for _, item in ipairs(data) do
-            if not item.auto then
+            if not item.auto_discovered then
                 table.insert(results, item)
             end
         end
@@ -631,7 +631,7 @@ function Analysis:function_classification()
             table.insert(stats.exported_list, func)
         end
 
-        if func.auto then
+        if func.auto_discovered then
             stats.auto_discovered = stats.auto_discovered + 1
         else
             stats.user_defined = stats.user_defined + 1

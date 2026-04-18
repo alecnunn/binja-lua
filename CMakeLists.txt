@@ -22,7 +22,9 @@
 
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
-project(BinjaLua C CXX)
+project(BinjaLua
+    VERSION 0.2.0
+    LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -121,16 +123,22 @@ add_subdirectory(${BN_API_PATH} api)
 # Binding sources (sol2-based)
 set(BINDING_SOURCES
     bindings/common.cpp
+    bindings/architecture.cpp
     bindings/basicblock.cpp
     bindings/binaryview.cpp
+    bindings/callingconvention.cpp
     bindings/function.cpp
     bindings/instruction.cpp
+    bindings/platform.cpp
     bindings/variable.cpp
     bindings/datavariable.cpp
     bindings/types.cpp
     bindings/tag.cpp
     bindings/il.cpp
     bindings/flowgraph.cpp
+    bindings/section.cpp
+    bindings/symbol.cpp
+    bindings/selection.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED
@@ -141,5 +149,13 @@ add_library(${PROJECT_NAME} SHARED
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${LUA_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC binaryninjaapi ${LUA_LIBRARIES} sol2::sol2)
+
+# Version source-of-truth plumbing. See docs/versioning.md section 3
+# for the policy; bindings/version.h picks these up via preprocessor.
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    BINJALUA_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    BINJALUA_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    BINJALUA_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    BINJALUA_VERSION_STRING="${PROJECT_VERSION}")
 
 bn_install_plugin(${PROJECT_NAME})

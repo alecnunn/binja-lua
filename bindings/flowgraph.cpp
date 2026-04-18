@@ -4,32 +4,76 @@
 
 namespace BinjaLua {
 
-// Helper to convert branch type string to enum
+// Helper to convert branch type string to enum. Vocabulary matches
+// EnumToString(BNBranchType). Unknown strings fall back to
+// UnconditionalBranch.
 static BNBranchType StringToBranchType(const std::string& type) {
     if (type == "unconditional") return UnconditionalBranch;
-    if (type == "false") return FalseBranch;
-    if (type == "true") return TrueBranch;
-    if (type == "call") return CallDestination;
-    if (type == "return") return FunctionReturn;
-    if (type == "syscall") return SystemCall;
-    if (type == "indirect") return IndirectBranch;
-    if (type == "exception") return ExceptionBranch;
+    if (type == "false")         return FalseBranch;
+    if (type == "true")          return TrueBranch;
+    if (type == "call")          return CallDestination;
+    if (type == "return")        return FunctionReturn;
+    if (type == "syscall")       return SystemCall;
+    if (type == "indirect")      return IndirectBranch;
+    if (type == "exception")     return ExceptionBranch;
+    if (type == "unresolved")    return UnresolvedBranch;
+    if (type == "user_defined")  return UserDefinedBranch;
     return UnconditionalBranch;
 }
 
-// Helper to convert branch type enum to string
-static std::string BranchTypeToString(BNBranchType type) {
-    switch (type) {
-        case UnconditionalBranch: return "unconditional";
-        case FalseBranch: return "false";
-        case TrueBranch: return "true";
-        case CallDestination: return "call";
-        case FunctionReturn: return "return";
-        case SystemCall: return "syscall";
-        case IndirectBranch: return "indirect";
-        case ExceptionBranch: return "exception";
-        default: return "unknown";
-    }
+// Reverse lookup for BNEdgePenStyle. Names match Qt's Qt::PenStyle but
+// are lowercased/underscored for Lua consumption.
+static BNEdgePenStyle StringToEdgePenStyle(const std::string& s) {
+    if (s == "none")          return NoPen;
+    if (s == "solid")         return SolidLine;
+    if (s == "dash")          return DashLine;
+    if (s == "dot")           return DotLine;
+    if (s == "dash_dot")      return DashDotLine;
+    if (s == "dash_dot_dot")  return DashDotDotLine;
+    return SolidLine;
+}
+
+// Reverse lookup for the subset of BNThemeColor that BNEdgeStyle uses:
+// the standard highlight colors plus the three branch-specific theme
+// colors. Anything unknown defaults to WhiteStandardHighlightColor so
+// the edge remains visible.
+static BNThemeColor StringToEdgeThemeColor(const std::string& s) {
+    if (s == "blue")                return BlueStandardHighlightColor;
+    if (s == "green")               return GreenStandardHighlightColor;
+    if (s == "cyan")                return CyanStandardHighlightColor;
+    if (s == "red")                 return RedStandardHighlightColor;
+    if (s == "magenta")             return MagentaStandardHighlightColor;
+    if (s == "yellow")              return YellowStandardHighlightColor;
+    if (s == "orange")              return OrangeStandardHighlightColor;
+    if (s == "white")               return WhiteStandardHighlightColor;
+    if (s == "black")               return BlackStandardHighlightColor;
+    if (s == "true_branch")         return TrueBranchColor;
+    if (s == "false_branch")        return FalseBranchColor;
+    if (s == "unconditional_branch") return UnconditionalBranchColor;
+    return WhiteStandardHighlightColor;
+}
+
+// Parse an edge style table. Any of style/width/color may be omitted
+// and will keep the default solid-white style.
+static BNEdgeStyle ParseEdgeStyle(sol::optional<sol::table> opts) {
+    BNEdgeStyle style;
+    style.style = SolidLine;
+    style.width = 1;
+    style.color = WhiteStandardHighlightColor;
+
+    if (!opts) return style;
+    const sol::table& t = *opts;
+
+    sol::optional<std::string> s = t["style"];
+    if (s) style.style = StringToEdgePenStyle(*s);
+
+    sol::optional<size_t> w = t["width"];
+    if (w) style.width = *w;
+
+    sol::optional<std::string> c = t["color"];
+    if (c) style.color = StringToEdgeThemeColor(*c);
+
+    return style;
 }
 
 void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
@@ -55,8 +99,13 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             }
         ),
 
-        // Get highlight color
-        "highlight", sol::property([](sol::this_state ts, FlowGraphNode& node) -> sol::table {
+        // Get highlight color. Bound as a method (colon-call) rather
+        // than a property because sol2 3.3.0 crashes on MSVC when
+        // sol::property is combined with sol::this_state. Same
+        // workaround as tasks #12 / #14 / #15; see task #16 for the
+        // audit that caught this one.
+        "highlight", [](sol::this_state ts, FlowGraphNode& node)
+                          -> sol::table {
             sol::state_view lua(ts);
             sol::table result = lua.create_table();
             BNHighlightColor color = node.GetHighlight();
@@ -67,7 +116,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             result["b"] = color.b;
             result["alpha"] = color.alpha;
             return result;
-        }),
+        },
 
         // Get display lines
         "lines", [](sol::this_state ts, FlowGraphNode& node) -> sol::table {
@@ -136,7 +185,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             const std::vector<FlowGraphEdge>& edges = node.GetOutgoingEdges();
             for (size_t i = 0; i < edges.size(); i++) {
                 sol::table edge = lua.create_table();
-                edge["type"] = BranchTypeToString(edges[i].type);
+                edge["branch_type"] = EnumToString(edges[i].type);
                 edge["target"] = edges[i].target;
                 edge["back_edge"] = edges[i].backEdge;
 
@@ -161,7 +210,7 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             const std::vector<FlowGraphEdge>& edges = node.GetIncomingEdges();
             for (size_t i = 0; i < edges.size(); i++) {
                 sol::table edge = lua.create_table();
-                edge["type"] = BranchTypeToString(edges[i].type);
+                edge["branch_type"] = EnumToString(edges[i].type);
                 edge["target"] = edges[i].target;
                 edge["back_edge"] = edges[i].backEdge;
                 result[i + 1] = edge;
@@ -169,14 +218,14 @@ void RegisterFlowGraphBindings(sol::state_view lua, Ref<Logger> logger) {
             return result;
         },
 
-        // Add outgoing edge
+        // Add outgoing edge. The third argument is an optional style
+        // table: { style="solid"|"dash"|..., width=N, color="blue"|... }.
+        // Any missing key keeps the solid-white default.
         "add_outgoing_edge", [](FlowGraphNode& node, const std::string& type,
-                                FlowGraphNode& target) {
-            BNEdgeStyle style;
-            style.style = SolidLine;
-            style.width = 1;
-            style.color = WhiteStandardHighlightColor;
-            node.AddOutgoingEdge(StringToBranchType(type), &target, style);
+                                FlowGraphNode& target,
+                                sol::optional<sol::table> style_opts) {
+            node.AddOutgoingEdge(StringToBranchType(type), &target,
+                                 ParseEdgeStyle(style_opts));
         },
 
         // Comparison

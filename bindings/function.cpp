@@ -16,16 +16,8 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         "start_addr", sol::property([](Function& f) -> HexAddress {
             return HexAddress(f.GetStart());
         }),
-        // Alias for start_addr
-        "start", sol::property([](Function& f) -> HexAddress {
-            return HexAddress(f.GetStart());
-        }),
 
         "end_addr", sol::property([](Function& f) -> HexAddress {
-            return HexAddress(f.GetHighestAddress());
-        }),
-        // Alias for end_addr
-        "end", sol::property([](Function& f) -> HexAddress {
             return HexAddress(f.GetHighestAddress());
         }),
 
@@ -38,9 +30,17 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             return sym ? sym->GetShortName() : "<unnamed>";
         }),
 
-        "arch", sol::property([](Function& f) -> std::string {
-            Ref<Architecture> arch = f.GetArchitecture();
-            return arch ? arch->GetName() : "<unknown>";
+        "arch", sol::property([](Function& f) -> Ref<Architecture> {
+            return f.GetArchitecture();
+        }),
+
+        "calling_convention", sol::property([](Function& f)
+                                                 -> Ref<CallingConvention> {
+            return f.GetCallingConvention().GetValue();
+        }),
+
+        "platform", sol::property([](Function& f) -> Ref<Platform> {
+            return f.GetPlatform();
         }),
 
         "comment", sol::property([](Function& f) -> std::string {
@@ -95,28 +95,11 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         }),
 
         "analysis_skip_reason", sol::property([](Function& f) -> std::string {
-            BNAnalysisSkipReason reason = f.GetAnalysisSkipReason();
-            switch (reason) {
-                case NoSkipReason: return "none";
-                case AlwaysSkipReason: return "always";
-                case ExceedFunctionSizeSkipReason: return "exceed_size";
-                case ExceedFunctionAnalysisTimeSkipReason: return "exceed_time";
-                case ExceedFunctionUpdateCountSkipReason: return "exceed_updates";
-                case NewAutoFunctionAnalysisSuppressedReason: return "new_auto_suppressed";
-                case BasicAnalysisSkipReason: return "basic_analysis";
-                case IntermediateAnalysisSkipReason: return "intermediate_analysis";
-                case AnalysisPipelineSuspendedReason: return "pipeline_suspended";
-                default: return "unknown";
-            }
+            return EnumToString(f.GetAnalysisSkipReason());
         }),
 
         "can_return", sol::property([](Function& f) -> bool {
             return f.CanReturn().GetValue();
-        }),
-
-        // Alias for auto_discovered for Python API compatibility
-        "auto", sol::property([](Function& f) -> bool {
-            return f.WasAutomaticallyDiscovered();
         }),
 
         // is_exported: true if function symbol has global or weak binding
@@ -154,17 +137,10 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         // Collection methods - use method syntax: func:basic_blocks(), func:callers(), etc.
         // Note: sol::property with sol::this_state causes crashes, so these are methods
         "basic_blocks", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<Ref<BasicBlock>> blocks = f.GetBasicBlocks();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < blocks.size(); i++) {
-                result[i + 1] = blocks[i];
-            }
-            return result;
+            return ToLuaTable(ts, f.GetBasicBlocks());
         },
 
         "calls", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
             std::vector<ReferenceSource> call_sites = f.GetCallSites();
             std::vector<Ref<Function>> called;
             Ref<BinaryView> view = f.GetView();
@@ -176,11 +152,7 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
                 }
             }
 
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < called.size(); i++) {
-                result[i + 1] = called[i];
-            }
-            return result;
+            return ToLuaTable(ts, called);
         },
 
         "callers", [](sol::this_state ts, Function& f) -> sol::table {
@@ -198,17 +170,7 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
 
         // Additional cross-reference methods
         "call_sites", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
-            std::vector<ReferenceSource> sites = f.GetCallSites();
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < sites.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(sites[i].addr);
-                if (sites[i].func) entry["func"] = sites[i].func;
-                if (sites[i].arch) entry["arch"] = sites[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, f.GetCallSites());
         },
 
         "callees", [](sol::this_state ts, Function& f) -> sol::table {
@@ -258,18 +220,8 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         "caller_sites", [](sol::this_state ts, Function& f) -> sol::table {
-            sol::state_view lua(ts);
             Ref<BinaryView> view = f.GetView();
-            std::vector<ReferenceSource> refs = view->GetCallers(f.GetStart());
-            sol::table result = lua.create_table();
-            for (size_t i = 0; i < refs.size(); i++) {
-                sol::table entry = lua.create_table();
-                entry["address"] = HexAddress(refs[i].addr);
-                if (refs[i].func) entry["func"] = refs[i].func;
-                if (refs[i].arch) entry["arch"] = refs[i].arch->GetName();
-                result[i + 1] = entry;
-            }
-            return result;
+            return ReferenceSourcesToTable(ts, view->GetCallers(f.GetStart()));
         },
 
         "variables", [](sol::this_state ts, Function& f) -> sol::table {
@@ -361,8 +313,10 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         },
 
         // Comment methods
-        "comment_at_address", [](Function& f, uint64_t addr) -> std::string {
-            return f.GetCommentForAddress(addr);
+        "comment_at_address", [](Function& f, sol::object addr_obj) -> std::string {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return "";
+            return f.GetCommentForAddress(*addr);
         },
 
         "set_comment", [](Function& f, const std::string& comment) -> bool {
@@ -370,8 +324,11 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             return true;
         },
 
-        "set_comment_at_address", [](Function& f, uint64_t addr, const std::string& comment) -> bool {
-            f.SetCommentForAddress(addr, comment);
+        "set_comment_at_address",
+        [](Function& f, sol::object addr_obj, const std::string& comment) -> bool {
+            auto addr = AsAddress(addr_obj);
+            if (!addr) return false;
+            f.SetCommentForAddress(*addr, comment);
             return true;
         },
 
@@ -1002,65 +959,11 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         "store_metadata", [](sol::this_state ts, Function& f,
                             const std::string& key, sol::object value,
                             sol::optional<bool> isAuto) {
-            BNMetadata* md = nullptr;
-
-            if (value.is<bool>()) {
-                md = BNCreateMetadataBooleanData(value.as<bool>());
-            } else if (value.is<std::string>()) {
-                md = BNCreateMetadataStringData(value.as<std::string>().c_str());
-            } else if (value.get_type() == sol::type::number) {
-                // Handle all numbers - check if integer or float
-                double d = value.as<double>();
-                // Check if it's actually a whole number (no fractional part)
-                if (d == std::floor(d) && d >= INT64_MIN && d <= INT64_MAX) {
-                    md = BNCreateMetadataSignedIntegerData(static_cast<int64_t>(d));
-                } else {
-                    md = BNCreateMetadataDoubleData(d);
-                }
-            } else if (value.is<sol::table>()) {
-                // Key-value store
-                sol::table tbl = value.as<sol::table>();
-                std::vector<const char*> keys;
-                std::vector<BNMetadata*> values;
-                std::vector<std::string> keyStorage;
-
-                for (auto& kv : tbl) {
-                    if (kv.first.is<std::string>()) {
-                        keyStorage.push_back(kv.first.as<std::string>());
-
-                        BNMetadata* val = nullptr;
-                        if (kv.second.is<bool>()) {
-                            val = BNCreateMetadataBooleanData(kv.second.as<bool>());
-                        } else if (kv.second.is<std::string>()) {
-                            val = BNCreateMetadataStringData(
-                                kv.second.as<std::string>().c_str());
-                        } else if (kv.second.is<int64_t>()) {
-                            val = BNCreateMetadataSignedIntegerData(kv.second.as<int64_t>());
-                        } else if (kv.second.is<double>()) {
-                            val = BNCreateMetadataDoubleData(kv.second.as<double>());
-                        }
-
-                        if (val) {
-                            values.push_back(val);
-                        }
-                    }
-                }
-
-                if (!keyStorage.empty() && keyStorage.size() == values.size()) {
-                    for (const auto& k : keyStorage) {
-                        keys.push_back(k.c_str());
-                    }
-                    md = BNCreateMetadataValueStore(keys.data(), values.data(), keys.size());
-                }
-
-                for (auto* v : values) {
-                    BNFreeMetadata(v);
-                }
-            }
-
+            (void)ts;
+            BNMetadata* md = MetadataFromLua(value);
             if (md) {
-                BNFunctionStoreMetadata(Function::GetObject(&f), key.c_str(), md,
-                                       isAuto.value_or(false));
+                BNFunctionStoreMetadata(Function::GetObject(&f), key.c_str(),
+                                       md, isAuto.value_or(false));
                 BNFreeMetadata(md);
             }
         },
@@ -1069,72 +972,12 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
         "query_metadata", [](sol::this_state ts, Function& f,
                             const std::string& key) -> sol::object {
             sol::state_view lua(ts);
-
-            BNMetadata* md = BNFunctionQueryMetadata(Function::GetObject(&f), key.c_str());
+            BNMetadata* md = BNFunctionQueryMetadata(Function::GetObject(&f),
+                                                     key.c_str());
             if (!md) {
                 return sol::make_object(lua, sol::nil);
             }
-
-            sol::object result = sol::make_object(lua, sol::nil);
-            BNMetadataType type = BNMetadataGetType(md);
-
-            switch (type) {
-                case BooleanDataType:
-                    result = sol::make_object(lua, BNMetadataGetBoolean(md));
-                    break;
-                case StringDataType: {
-                    char* str = BNMetadataGetString(md);
-                    if (str) {
-                        result = sol::make_object(lua, std::string(str));
-                        BNFreeString(str);
-                    }
-                    break;
-                }
-                case UnsignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetUnsignedInteger(md));
-                    break;
-                case SignedIntegerDataType:
-                    result = sol::make_object(lua, BNMetadataGetSignedInteger(md));
-                    break;
-                case DoubleDataType:
-                    result = sol::make_object(lua, BNMetadataGetDouble(md));
-                    break;
-                case KeyValueDataType: {
-                    BNMetadataValueStore* store = BNMetadataGetValueStore(md);
-                    if (store) {
-                        sol::table tbl = lua.create_table();
-                        for (size_t i = 0; i < store->size; i++) {
-                            BNMetadataType vtype = BNMetadataGetType(store->values[i]);
-                            if (vtype == StringDataType) {
-                                char* str = BNMetadataGetString(store->values[i]);
-                                if (str) {
-                                    tbl[store->keys[i]] = std::string(str);
-                                    BNFreeString(str);
-                                }
-                            } else if (vtype == BooleanDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetBoolean(store->values[i]);
-                            } else if (vtype == SignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetSignedInteger(store->values[i]);
-                            } else if (vtype == UnsignedIntegerDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetUnsignedInteger(store->values[i]);
-                            } else if (vtype == DoubleDataType) {
-                                tbl[store->keys[i]] = BNMetadataGetDouble(store->values[i]);
-                            }
-                        }
-                        result = sol::make_object(lua, tbl);
-                        BNFreeMetadataValueStore(store);
-                    }
-                    break;
-                }
-                default:
-                    char* json = BNMetadataGetJsonString(md);
-                    if (json) {
-                        result = sol::make_object(lua, std::string(json));
-                        BNFreeString(json);
-                    }
-                    break;
-            }
-
+            sol::object result = MetadataToLua(lua, md);
             BNFreeMetadata(md);
             return result;
         },

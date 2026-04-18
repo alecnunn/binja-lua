@@ -2,12 +2,374 @@
 
 *Generated from API definitions*
 
+## Migration from pre-R3d property names
+
+R3d removed several short-form property aliases that duplicated a
+longer canonical name. Each removal has a one-line replacement:
+
+| Removed                | Canonical replacement     | Before                   | After                           |
+|------------------------|---------------------------|--------------------------|---------------------------------|
+| `BinaryView.start`     | `BinaryView.start_addr`   | `bv.start`               | `bv.start_addr`                 |
+| `BinaryView["end"]`    | `BinaryView.end_addr`     | `bv["end"]`              | `bv.end_addr`                   |
+| `BinaryView.file`      | `BinaryView.filename`     | `bv.file`                | `bv.filename`                   |
+| `Function.start`       | `Function.start_addr`     | `func.start`             | `func.start_addr`               |
+| `Function["end"]`      | `Function.end_addr`       | `func["end"]`            | `func.end_addr`                 |
+| `Function.auto`        | `Function.auto_discovered`| `if func.auto then`      | `if func.auto_discovered then`  |
+| `Variable.type`        | `Variable.type_name`      | `print(var.type)`        | `print(var.type_name)`          |
+| `Function.arch` (string) | `Function.arch.name`    | `print(func.arch)`       | `print(func.arch.name)`         |
+| `BinaryView.arch` (string) | `BinaryView.arch.name`| `print(bv.arch)`         | `print(bv.arch.name)`           |
+| `BasicBlock.arch` (string) | `BasicBlock.arch.name`| `print(bb.arch)`         | `print(bb.arch.name)`           |
+| `Instruction.arch` (string)| `Instruction.arch.name`| `print(inst.arch)`      | `print(inst.arch.name)`         |
+| `Variable:location().type == "stack"` | `"local"` (R2 canonical)| `if loc.type == "stack"` | `if loc.type == "local"`     |
+| `Architecture.link_reg` (prop)      | `Architecture:link_reg()` (method)      | `arch.link_reg`              | `arch:link_reg()`              |
+| `Architecture.regs` (prop)          | `Architecture:regs()` (method)          | `arch.regs.rax`              | `arch:regs().rax`              |
+| `Architecture.full_width_regs` (prop)| `Architecture:full_width_regs()` (method)| `arch.full_width_regs`      | `arch:full_width_regs()`       |
+| `Architecture.global_regs` (prop)   | `Architecture:global_regs()` (method)   | `arch.global_regs`           | `arch:global_regs()`           |
+| `Architecture.system_regs` (prop)   | `Architecture:system_regs()` (method)   | `arch.system_regs`           | `arch:system_regs()`           |
+| `Architecture.flags` (prop)         | `Architecture:flags()` (method)         | `arch.flags`                 | `arch:flags()`                 |
+| `Architecture.flag_write_types` (prop)| `Architecture:flag_write_types()` (method)| `arch.flag_write_types`     | `arch:flag_write_types()`      |
+| `Architecture.semantic_flag_classes` (prop)| `Architecture:semantic_flag_classes()` (method)| `arch.semantic_flag_classes`| `arch:semantic_flag_classes()`|
+| `Architecture.semantic_flag_groups` (prop) | `Architecture:semantic_flag_groups()` (method) | `arch.semantic_flag_groups` | `arch:semantic_flag_groups()` |
+| `Architecture.flag_roles` (prop)    | `Architecture:flag_roles()` (method)    | `arch.flag_roles.z`          | `arch:flag_roles().z`          |
+| `CallingConvention.caller_saved_regs` (prop)     | `CallingConvention:caller_saved_regs()` (method)     | `cc.caller_saved_regs`     | `cc:caller_saved_regs()`     |
+| `CallingConvention.callee_saved_regs` (prop)     | `CallingConvention:callee_saved_regs()` (method)     | `cc.callee_saved_regs`     | `cc:callee_saved_regs()`     |
+| `CallingConvention.int_arg_regs` (prop)          | `CallingConvention:int_arg_regs()` (method)          | `cc.int_arg_regs`          | `cc:int_arg_regs()`          |
+| `CallingConvention.float_arg_regs` (prop)        | `CallingConvention:float_arg_regs()` (method)        | `cc.float_arg_regs`        | `cc:float_arg_regs()`        |
+| `CallingConvention.required_arg_regs` (prop)     | `CallingConvention:required_arg_regs()` (method)     | `cc.required_arg_regs`     | `cc:required_arg_regs()`     |
+| `CallingConvention.required_clobbered_regs` (prop)| `CallingConvention:required_clobbered_regs()` (method)| `cc.required_clobbered_regs`| `cc:required_clobbered_regs()`|
+| `CallingConvention.implicitly_defined_regs` (prop)| `CallingConvention:implicitly_defined_regs()` (method)| `cc.implicitly_defined_regs`| `cc:implicitly_defined_regs()`|
+| `CallingConvention.int_return_reg` (prop)        | `CallingConvention:int_return_reg()` (method)        | `cc.int_return_reg`        | `cc:int_return_reg()`        |
+| `CallingConvention.high_int_return_reg` (prop)   | `CallingConvention:high_int_return_reg()` (method)   | `cc.high_int_return_reg`   | `cc:high_int_return_reg()`   |
+| `CallingConvention.float_return_reg` (prop)      | `CallingConvention:float_return_reg()` (method)      | `cc.float_return_reg`      | `cc:float_return_reg()`      |
+| `CallingConvention.global_pointer_reg` (prop)    | `CallingConvention:global_pointer_reg()` (method)    | `cc.global_pointer_reg`    | `cc:global_pointer_reg()`    |
+| `Platform.global_regs` (prop)   | `Platform:global_regs()` (method)   | `bv.platform.global_regs`   | `bv.platform:global_regs()`   |
+| `Platform.types` (prop)         | `Platform:types()` (method)         | `bv.platform.types`         | `bv.platform:types()`         |
+| `Platform.variables` (prop)     | `Platform:variables()` (method)     | `bv.platform.variables`     | `bv.platform:variables()`     |
+| `Platform.functions` (prop)     | `Platform:functions()` (method)     | `bv.platform.functions`     | `bv.platform:functions()`     |
+| `Platform.system_calls` (prop)  | `Platform:system_calls()` (method)  | `bv.platform.system_calls`  | `bv.platform:system_calls()`  |
+| `FlowGraphNode.highlight` (prop)| `FlowGraphNode:highlight()` (method)| `node.highlight`            | `node:highlight()`            |
+
+The Architecture (task #12), CallingConvention (task #14), Platform
+(task #15), and FlowGraphNode (task #16) method-form changes are
+forced by a sol2 3.3.0 crash on MSVC when `sol::property` is combined
+with `sol::this_state`. The affected accessors were rebound as
+methods; return value types are unchanged.
+
+`Function.arch` now returns an `Architecture` usertype (added in R4)
+instead of the architecture's name string. Existing scripts that used
+`func.arch` as a string must replace it with `func.arch.name`. The
+underlying object exposes the full read-only Architecture surface
+(registers, flags, decode helpers).
+
+`end_addr` is the single canonical name across every address-range
+usertype. It is spelled out explicitly because `end` is a Lua
+reserved keyword and had to be accessed as `obj["end"]` anyway; the
+bracket form is no longer supported.
+
+## Enum vocabulary
+
+Several properties return BN enum values as strings, and a few
+methods accept enum values as string arguments. The Lua-visible
+**output** is always the short canonical form listed in the "Lua"
+column below. Any method that **accepts** an enum string will also
+accept the verbatim Python/C enumerator name from the "Python"
+column - either form is fine. Matches are case-sensitive.
+
+Python users porting code from `binaryninja-api/python/*.py` can
+paste enum names straight over; script authors who want terser
+Lua can use the short names.
+
+### BNBranchType
+
+Used on `FlowGraphEdge.branch_type`, `BasicBlock:outgoing_edges`,
+`BasicBlock:incoming_edges`, and `FlowGraphNode:add_outgoing_edge`.
+
+| Lua              | Python               |
+|------------------|----------------------|
+| `unconditional`  | `UnconditionalBranch`|
+| `false`          | `FalseBranch`        |
+| `true`           | `TrueBranch`         |
+| `call`           | `CallDestination`    |
+| `return`         | `FunctionReturn`     |
+| `syscall`        | `SystemCall`         |
+| `indirect`       | `IndirectBranch`     |
+| `exception`      | `ExceptionBranch`    |
+| `unresolved`     | `UnresolvedBranch`   |
+| `user_defined`   | `UserDefinedBranch`  |
+
+### BNSymbolType
+
+Used on `Symbol.type` and as input to
+`BinaryView:get_symbols_of_type`.
+
+| Lua                 | Python                    |
+|---------------------|---------------------------|
+| `Function`          | `FunctionSymbol`          |
+| `ImportAddress`     | `ImportAddressSymbol`     |
+| `ImportedFunction`  | `ImportedFunctionSymbol`  |
+| `Data`              | `DataSymbol`              |
+| `ImportedData`      | `ImportedDataSymbol`      |
+| `External`          | `ExternalSymbol`          |
+| `LibraryFunction`   | `LibraryFunctionSymbol`   |
+| `SymbolicFunction`  | `SymbolicFunctionSymbol`  |
+| `LocalLabel`        | `LocalLabelSymbol`        |
+
+### BNSectionSemantics
+
+Used on `Section.semantics`.
+
+| Lua        | Python                           |
+|------------|----------------------------------|
+| `default`  | `DefaultSectionSemantics`        |
+| `code`     | `ReadOnlyCodeSectionSemantics`   |
+| `ro_data`  | `ReadOnlyDataSectionSemantics`   |
+| `rw_data`  | `ReadWriteDataSectionSemantics`  |
+| `external` | `ExternalSectionSemantics`       |
+
+### BNTypeClass
+
+Used on `Type.type_class`.
+
+| Lua                    | Python                   |
+|------------------------|--------------------------|
+| `Void`                 | `VoidTypeClass`          |
+| `Bool`                 | `BoolTypeClass`          |
+| `Integer`              | `IntegerTypeClass`       |
+| `Float`                | `FloatTypeClass`         |
+| `Structure`            | `StructureTypeClass`     |
+| `Enumeration`          | `EnumerationTypeClass`   |
+| `Pointer`              | `PointerTypeClass`       |
+| `Array`                | `ArrayTypeClass`         |
+| `Function`             | `FunctionTypeClass`      |
+| `VarArgs`              | `VarArgsTypeClass`       |
+| `Value`                | `ValueTypeClass`         |
+| `NamedTypeReference`   | `NamedTypeReferenceClass`|
+| `WideChar`             | `WideCharTypeClass`      |
+
+### BNAnalysisState
+
+Used on the `state` field of `BinaryView:get_analysis_progress()`.
+
+| Lua                | Python                |
+|--------------------|-----------------------|
+| `initial`          | `InitialState`        |
+| `hold`             | `HoldState`           |
+| `idle`             | `IdleState`           |
+| `discovery`        | `DiscoveryState`      |
+| `disassemble`      | `DisassembleState`    |
+| `analyze`          | `AnalyzeState`        |
+| `extended_analyze` | `ExtendedAnalyzeState`|
+
+### BNAnalysisSkipReason
+
+Used on `Function.analysis_skip_reason`.
+
+| Lua                      | Python                                     |
+|--------------------------|--------------------------------------------|
+| `none`                   | `NoSkipReason`                             |
+| `always`                 | `AlwaysSkipReason`                         |
+| `exceed_size`            | `ExceedFunctionSizeSkipReason`             |
+| `exceed_time`            | `ExceedFunctionAnalysisTimeSkipReason`     |
+| `exceed_updates`         | `ExceedFunctionUpdateCountSkipReason`      |
+| `new_auto_suppressed`    | `NewAutoFunctionAnalysisSuppressedReason`  |
+| `basic_analysis`         | `BasicAnalysisSkipReason`                  |
+| `intermediate_analysis`  | `IntermediateAnalysisSkipReason`           |
+| `pipeline_suspended`     | `AnalysisPipelineSuspendedReason`          |
+
+### BNMetadataType
+
+Used internally by `MetadataCodec` (no direct Lua-visible property
+today; listed for completeness).
+
+| Lua                | Python                    |
+|--------------------|---------------------------|
+| `invalid`          | `InvalidDataType`         |
+| `boolean`          | `BooleanDataType`         |
+| `string`           | `StringDataType`          |
+| `unsigned_integer` | `UnsignedIntegerDataType` |
+| `signed_integer`   | `SignedIntegerDataType`   |
+| `double`           | `DoubleDataType`          |
+| `raw`              | `RawDataType`             |
+| `key_value`        | `KeyValueDataType`        |
+| `array`            | `ArrayDataType`           |
+
+### BNMemberAccess
+
+Used on structure member metadata (no direct Lua-visible property
+today; listed for completeness).
+
+| Lua         | Python            |
+|-------------|-------------------|
+| `none`      | `NoAccess`        |
+| `private`   | `PrivateAccess`   |
+| `protected` | `ProtectedAccess` |
+| `public`    | `PublicAccess`    |
+
+### BNEndianness
+
+Used on `Architecture.endianness`.
+
+| Lua     | Python         |
+|---------|----------------|
+| `little`| `LittleEndian` |
+| `big`   | `BigEndian`    |
+
+### BNImplicitRegisterExtend
+
+Used on the `extend` field inside `Architecture.regs` entries.
+
+| Lua    | Python                  |
+|--------|-------------------------|
+| `none` | `NoExtend`              |
+| `zero` | `ZeroExtendToFullWidth` |
+| `sign` | `SignExtendToFullWidth` |
+
+### BNFlagRole
+
+Used on `Architecture.flag_roles` values and as the return value of
+`Architecture:get_flag_role`.
+
+| Lua             | Python                              |
+|-----------------|-------------------------------------|
+| `special`       | `SpecialFlagRole`                   |
+| `zero`          | `ZeroFlagRole`                      |
+| `pos_sign`      | `PositiveSignFlagRole`              |
+| `neg_sign`      | `NegativeSignFlagRole`              |
+| `carry`         | `CarryFlagRole`                     |
+| `overflow`      | `OverflowFlagRole`                  |
+| `half_carry`    | `HalfCarryFlagRole`                 |
+| `even_parity`   | `EvenParityFlagRole`                |
+| `odd_parity`    | `OddParityFlagRole`                 |
+| `ordered`       | `OrderedFlagRole`                   |
+| `unordered`     | `UnorderedFlagRole`                 |
+| `carry_inv_sub` | `CarryFlagWithInvertedSubtractRole` |
+
+### BNSymbolBinding
+
+Used on `Symbol.binding`.
+
+| Lua      | Python          |
+|----------|-----------------|
+| `none`   | `NoBinding`     |
+| `local`  | `LocalBinding`  |
+| `global` | `GlobalBinding` |
+| `weak`   | `WeakBinding`   |
+
+### BNVariableSourceType
+
+Used on `Variable.source_type`.
+
+| Lua        | Python                        |
+|------------|-------------------------------|
+| `local`    | `StackVariableSourceType`     |
+| `register` | `RegisterVariableSourceType`  |
+| `flag`     | `FlagVariableSourceType`      |
+
+### BNTypeReferenceType
+
+Used on the `ref_type` field of entries returned by
+`BinaryView:get_type_refs_for_type`.
+
+| Lua        | Python                        |
+|------------|-------------------------------|
+| `direct`   | `DirectTypeReferenceType`     |
+| `indirect` | `IndirectTypeReferenceType`   |
+| `unknown`  | `UnknownTypeReferenceType`    |
+
+### BNTagTypeType
+
+Used on `TagType.type`. Note that the enum is named `BNTagTypeType`
+(not `BNTagType`, which is the opaque BN core handle type).
+
+| Lua            | Python                |
+|----------------|-----------------------|
+| `user`         | `UserTagType`         |
+| `notification` | `NotificationTagType` |
+| `bookmarks`    | `BookmarksTagType`    |
+
+## Metadata round-trip
+
+`BinaryView:store_metadata` / `BinaryView:query_metadata` and the
+matching `Function` methods serialize Lua values through Binary
+Ninja's `BNMetadata` type system. Every `BNMetadataType` variant
+that Python supports round-trips cleanly, with a few deliberate
+Lua-flavoured choices worth knowing about.
+
+### Type mapping
+
+| Lua input              | BNMetadataType stored             | Comes back as            |
+|------------------------|-----------------------------------|--------------------------|
+| `true` / `false`       | `BooleanDataType`                 | Lua boolean              |
+| string, no embedded NUL| `StringDataType`                  | Lua string               |
+| string with embedded NUL| `RawDataType` (length-preserving)| Lua string               |
+| Lua integer            | `SignedIntegerDataType` (default) | Lua integer              |
+| integer-valued float   | `SignedIntegerDataType` (default) | Lua integer              |
+| fractional float       | `DoubleDataType`                  | Lua number               |
+| 1-indexed array table  | `ArrayDataType` (recursive)       | 1-indexed array table    |
+| string-keyed table     | `KeyValueDataType` (recursive)    | string-keyed table       |
+
+Arrays and key-value stores are encoded element-by-element
+through `BNMetadataArrayAppend` / `BNMetadataSetValueForKey`, so
+nested tables work without restriction. A key-value store whose
+values include arrays, or an array whose elements are themselves
+nested tables, round-trips to an equivalent Lua structure.
+
+Strings with embedded NUL bytes are encoded through
+`BNCreateMetadataRawData` so the full length round-trips (task
+#13). Strings without embedded NULs stay on the StringData path
+to preserve cross-language round-tripping with Python writers
+that store ordinary text under a key. On read, both the
+StringData and RawData paths materialize back into a Lua string
+that preserves the original bytes exactly.
+
+`InvalidDataType` is a sentinel and maps to `nil` on read - it
+should not appear for metadata your scripts wrote, and Python
+raises `TypeError` in the same spot.
+
+### Integer encoding: 64-bit precision and signedness
+
+`MetadataFromLua` distinguishes Lua 5.4 integers from floats via
+`lua_isinteger` and routes them separately. Lua integers use the
+full 64-bit `lua_Integer` path so values above 2^53 round-trip
+losslessly (task #13); integer-valued floats also take the
+integer path for consistency with pre-task-#13 scripts.
+
+Lua's `lua_Integer` is signed, so integer values encode as
+`SignedIntegerDataType` by default. This diverges from Python,
+which defaults unsigned in `Metadata.__init__` when the
+`signed` kwarg is falsy. The internal helper accepts a
+`prefer_unsigned=true` flag that forces
+`BNCreateMetadataUnsignedIntegerData` for non-negative values
+(and recursively for every child of an array or key-value
+table); the Lua-facing `store_metadata` method does not
+currently surface this flag. If you need unsigned encoding for
+a specific key, store it from Python.
+
+On read, `UnsignedIntegerDataType` and `SignedIntegerDataType`
+are both decoded correctly - the signed/unsigned divergence is
+only a concern for values that Python and Lua write into the
+same metadata key and then compare bit-for-bit.
+
+### No automatic JSON fallback
+
+Older versions of `MetadataCodec` fell back to
+`BNMetadataGetJsonString` for any variant the codec did not know
+about. That has been removed: the codec now dispatches on
+`BNMetadataGetType` directly and covers every variant. Unknown
+types return `nil`. If you need Python's explicit
+`Metadata.get_json_string()` escape hatch, it is not currently
+exposed as a Lua method - speak up if that becomes a real
+blocker and it can be wired onto a future `Metadata` usertype.
+
 ## Table of Contents
 
 - [HexAddress](#hexaddress)
 - [Selection](#selection)
 - [Section](#section)
 - [Symbol](#symbol)
+- [Architecture](#architecture)
+- [CallingConvention](#callingconvention)
+- [Platform](#platform)
 - [BinaryView](#binaryview)
 - [Function](#function)
 - [BasicBlock](#basicblock)
@@ -215,6 +577,472 @@ Numeric symbol type value for programmatic comparisons
 if sym.type == "Function" then ... end
 ```
 
+### Constructors
+
+#### `Symbol.new(sym_type, addr, short_name[, full_name[, raw_name[, binding[, ordinal]]]])` -> `Symbol`
+
+Construct a new Symbol for use with
+`BinaryView:define_user_symbol` / `define_auto_symbol`. The shape
+mirrors Python's `binaryninja.types.Symbol.__init__`.
+
+**Parameters:**
+- `sym_type` (string) - Any value from [BNSymbolType](#bnsymboltype)
+  (short canonical form like `"Function"` or Python-verbatim form
+  like `"FunctionSymbol"`).
+- `addr` (HexAddress|integer) - Address the symbol refers to.
+- `short_name` (string) - Primary display name.
+- `full_name` (string, optional) - Full qualified name. Defaults to
+  `short_name`.
+- `raw_name` (string, optional) - Mangled / raw name. Defaults to
+  `full_name`.
+- `binding` (string, optional) - Any value from
+  [BNSymbolBinding](#bnsymbolbinding). Defaults to `"none"`.
+- `ordinal` (integer, optional) - Export ordinal. Defaults to `0`.
+
+Returns `nil` if `sym_type` is unrecognised or `addr` cannot be
+coerced. Namespace selection is intentionally not exposed here
+because the `NameSpace` usertype is not bound; symbols constructed
+via this factory always land in the default internal namespace.
+
+**Example:**
+```lua
+local sym = Symbol.new("Function", 0x401000, "decrypt_buffer")
+bv:define_user_symbol(sym)
+```
+
+---
+
+## Architecture
+
+*Read-only view of a Binary Ninja architecture (x86, arm, thumb2, ...).
+Obtained via `func.arch`, `Architecture.get_by_name(name)`, or the
+`branches[i].arch` field returned by `get_instruction_info`. The
+surface mirrors the Python `CoreArchitecture` read shape from
+`binaryninja.architecture`. Write-side, assembly, patching, and
+intrinsics are deliberately not exposed.*
+
+### Properties
+
+#### `Architecture.name` -> `string`
+
+Architecture name (e.g. "x86_64", "aarch64", "thumb2").
+
+#### `Architecture.endianness` -> `string`
+
+`"little"` or `"big"`. See [BNEndianness](#bnendianness).
+
+#### `Architecture.address_size` -> `integer`
+
+Pointer size in bytes.
+
+#### `Architecture.default_int_size` -> `integer`
+
+Default integer width in bytes.
+
+#### `Architecture.instr_alignment` -> `integer`
+
+Minimum instruction alignment in bytes.
+
+#### `Architecture.max_instr_length` -> `integer`
+
+Maximum decode-buffer length. This is the BN plugin's decode buffer
+size, not the CPU's architectural maximum instruction length.
+
+#### `Architecture.opcode_display_length` -> `integer`
+
+Number of opcode bytes displayed per line in disassembly.
+
+#### `Architecture.stack_pointer` -> `string`
+
+Name of the stack pointer register, or the empty string if unset.
+
+#### `Architecture.can_assemble` -> `boolean`
+
+Whether this architecture implements `Assemble`. Read-only query only;
+the `Assemble` method itself is not bound.
+
+#### `Architecture.standalone_platform` -> `Platform|nil`
+
+Standalone platform synthesised for this architecture when it is not
+associated with any file-format-specific platform. See the Platform
+section for the read-only surface.
+
+### Methods
+
+The register catalog, register/flag name lists, and `link_reg` are
+bound as methods (colon-call) rather than properties. sol2 3.3.0 on
+MSVC crashes when `sol::property` is combined with `sol::this_state`
+(the handle required to build a Lua-side table), so every accessor
+that needs to return a table takes the method form. Return types are
+unchanged from the original property-form draft.
+
+#### `Architecture:link_reg()` -> `string|nil`
+
+Name of the link register, or `nil` if this architecture has no link
+register. The underlying `0xffffffff` sentinel is translated to `nil`.
+
+#### `Architecture:regs()` -> `table<string, RegisterInfo>`
+
+Register catalog keyed by register name. Each value is a table
+`{full_width_reg, size, offset, extend, index}`. `extend` uses the
+short canonical string form from
+[BNImplicitRegisterExtend](#bnimplicitregisterextend).
+
+**Example:**
+```lua
+local arch = Architecture.get_by_name("x86_64")
+local regs = arch:regs()
+print(regs.rax.size, regs.rax.full_width_reg)
+```
+
+#### `Architecture:full_width_regs()` -> `table<string>`
+
+Names of full-width registers.
+
+#### `Architecture:global_regs()` -> `table<string>`
+
+Names of global registers.
+
+#### `Architecture:system_regs()` -> `table<string>`
+
+Names of system registers.
+
+#### `Architecture:flags()` -> `table<string>`
+
+Names of all CPU flags.
+
+#### `Architecture:flag_write_types()` -> `table<string>`
+
+Names of flag write-type groups. Name list only; the write-type LLIL
+emission surface is not exposed.
+
+#### `Architecture:semantic_flag_classes()` -> `table<string>`
+
+Names of semantic flag classes.
+
+#### `Architecture:semantic_flag_groups()` -> `table<string>`
+
+Names of semantic flag groups.
+
+#### `Architecture:flag_roles()` -> `table<string, string>`
+
+Dict mapping flag name to role string. See
+[BNFlagRole](#bnflagrole) for the role vocabulary.
+
+#### `Architecture:get_reg_index(name)` -> `integer`
+
+Look up a register index by name.
+
+#### `Architecture:get_reg_name(index)` -> `string`
+
+Look up a register name by index.
+
+#### `Architecture:get_flag_role(flag[, sem_class])` -> `string`
+
+Return the role string of a specific flag. Optionally scoped to a
+semantic flag class index (defaults to 0).
+
+#### `Architecture:get_instruction_info(bytes, addr)` -> `table|nil`
+
+Decode a single instruction's control-flow information without going
+through a populated BinaryView. `bytes` is a Lua string of raw
+instruction bytes (8-bit clean, embedded NULs OK). Returns a table of
+shape:
+
+```
+{ length                           = int,
+  arch_transition_by_target_addr   = bool,
+  branch_delay                     = int,
+  branches = { { type   = string,
+                 target = HexAddress,
+                 arch   = Architecture? }, ... } }
+```
+
+`type` comes from [BNBranchType](#bnbranchtype). `target` is absent
+for unresolved branches; `arch` is only present when the branch
+transitions to a different architecture. Returns `nil` on decode
+failure.
+
+#### `Architecture:get_instruction_text(bytes, addr)` -> `(tokens, length)`
+
+Disassemble a single instruction to its token form. Returns two values:
+a table of instruction text tokens and the decoded instruction length
+in bytes. On decode failure, returns `nil, 0`.
+
+**Example:**
+```lua
+local arch = Architecture.get_by_name("x86_64")
+local bytes = "\x48\x89\xc3"   -- mov rbx, rax
+local tokens, length = arch:get_instruction_text(bytes, 0)
+print(length, #tokens)
+```
+
+#### `Architecture:get_associated_arch_by_address(addr)` -> `(arch, new_addr)`
+
+Return the architecture that applies at a given address together with
+a possibly-adjusted address. Used for ARM/Thumb mode switching.
+
+### Static accessors
+
+#### `Architecture.get_by_name(name)` -> `Architecture|nil`
+
+Look up an architecture by name.
+
+#### `Architecture.list()` -> `table<Architecture>`
+
+Return every registered architecture.
+
+#### `Architecture.contains(name)` -> `boolean`
+
+Shortcut for `Architecture.get_by_name(name) ~= nil`.
+
+---
+
+## CallingConvention
+
+*Read-only view of a Binary Ninja calling convention. Obtained via
+`func.calling_convention`. The surface mirrors the Python
+`CallingConvention` handle-initialised shape from
+`binaryninja.callingconvention`. The `confidence` / `with_confidence`
+Python-layer machinery is intentionally not exposed - the underlying
+C++ API has no confidence field on the calling convention itself, and
+only `Confidence<Ref<CallingConvention>>` wrapped by callers like
+Function actually carries that number.*
+
+### Properties
+
+#### `CallingConvention.name` -> `string`
+
+Calling convention name (e.g. `"cdecl"`, `"sysv"`, `"win64"`).
+
+#### `CallingConvention.arch` -> `Architecture`
+
+Architecture this calling convention is bound to.
+
+#### `CallingConvention.arg_regs_share_index` -> `boolean`
+
+Whether integer and float argument registers share the same index
+slot (e.g. both are consumed in one step).
+
+#### `CallingConvention.arg_regs_for_varargs` -> `boolean`
+
+Whether argument registers are also used for variadic arguments.
+
+#### `CallingConvention.stack_reserved_for_arg_regs` -> `boolean`
+
+Whether stack space is reserved even for arguments passed in
+registers.
+
+#### `CallingConvention.stack_adjusted_on_return` -> `boolean`
+
+Whether the stack pointer is adjusted by the callee on return
+(callee cleanup).
+
+#### `CallingConvention.eligible_for_heuristics` -> `boolean`
+
+Whether this calling convention is considered by the heuristic
+analysis that guesses a function's calling convention.
+
+### Methods
+
+The register set and single-register accessors are bound as methods
+(colon-call) rather than properties. sol2 3.3.0 on MSVC crashes when
+`sol::property` is combined with `sol::this_state` (the handle
+required to build the Lua-side name table / nil-passthrough return),
+so every accessor that needs the Lua state takes the method form.
+See the migration table at the top of this document for the
+before/after mapping. Return types are unchanged from the original
+property-form draft.
+
+#### `CallingConvention:caller_saved_regs()` -> `table<string>`
+
+Names of caller-saved registers.
+
+#### `CallingConvention:callee_saved_regs()` -> `table<string>`
+
+Names of callee-saved registers.
+
+#### `CallingConvention:int_arg_regs()` -> `table<string>`
+
+Integer argument registers in order.
+
+#### `CallingConvention:float_arg_regs()` -> `table<string>`
+
+Floating-point argument registers in order.
+
+#### `CallingConvention:required_arg_regs()` -> `table<string>`
+
+Registers that must be arguments for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention:required_clobbered_regs()` -> `table<string>`
+
+Registers that must be clobbered for heuristic matching to pick this
+calling convention.
+
+#### `CallingConvention:implicitly_defined_regs()` -> `table<string>`
+
+Registers implicitly defined on entry.
+
+#### `CallingConvention:int_return_reg()` -> `string|nil`
+
+Integer return value register, or `nil` if unset. The underlying
+`0xffffffff` sentinel is translated to `nil`.
+
+#### `CallingConvention:high_int_return_reg()` -> `string|nil`
+
+High-half integer return value register, or `nil` if unset.
+
+#### `CallingConvention:float_return_reg()` -> `string|nil`
+
+Floating-point return value register, or `nil` if unset.
+
+#### `CallingConvention:global_pointer_reg()` -> `string|nil`
+
+Global pointer register, or `nil` if unset.
+
+---
+
+## Platform
+
+*Read-only view of a Binary Ninja platform (e.g. `linux-x86_64`,
+`windows-x86_64`). Obtained via `bv.platform`, `func.platform`,
+`arch.standalone_platform`, or `Platform.get_by_name`. The surface
+mirrors the Python `CorePlatform` read shape from
+`binaryninja.platform`. Write-side registration, custom platform
+subclassing, and type library / type container accessors are
+deliberately not exposed; the type library entries land in R12.*
+
+### Properties
+
+#### `Platform.name` -> `string`
+
+Platform name (e.g. `"linux-x86_64"`).
+
+#### `Platform.arch` -> `Architecture`
+
+Architecture this platform is bound to.
+
+#### `Platform.address_size` -> `integer`
+
+Pointer size in bytes.
+
+#### `Platform.default_calling_convention` -> `CallingConvention|nil`
+
+Default calling convention for this platform, or `nil` if unset.
+
+#### `Platform.cdecl_calling_convention` -> `CallingConvention|nil`
+
+cdecl calling convention, or `nil` if this platform has no cdecl
+slot registered.
+
+#### `Platform.stdcall_calling_convention` -> `CallingConvention|nil`
+
+stdcall calling convention, or `nil` if unregistered.
+
+#### `Platform.fastcall_calling_convention` -> `CallingConvention|nil`
+
+fastcall calling convention, or `nil` if unregistered.
+
+#### `Platform.system_call_convention` -> `CallingConvention|nil`
+
+System call calling convention, or `nil` if unregistered.
+
+### Methods
+
+The global register catalog and the four platform-type accessors
+are bound as methods (colon-call) rather than properties. sol2
+3.3.0 on MSVC crashes when `sol::property` is combined with
+`sol::this_state`, so every accessor that needs to build a
+Lua-side table takes the method form (see tasks #12 / #14 / #15).
+Return types are unchanged from the original property-form draft.
+
+#### `Platform:global_regs()` -> `table<string>`
+
+Names of global registers for this platform.
+
+#### `Platform:types()` -> `table<string, Type>`
+
+Platform-specific types keyed by qualified name string.
+
+#### `Platform:variables()` -> `table<string, Type>`
+
+Platform-specific variable type definitions keyed by qualified name.
+
+#### `Platform:functions()` -> `table<string, Type>`
+
+Platform-specific function type definitions keyed by qualified name.
+
+#### `Platform:system_calls()` -> `table<integer, {name: string, type: Type}>`
+
+System call table keyed by syscall number, with each entry holding
+the syscall name and its function type.
+
+#### `Platform:calling_conventions()` -> `table<CallingConvention>`
+
+All calling conventions registered for this platform.
+
+#### `Platform:get_global_register_type(reg)` -> `Type|nil`
+
+Look up the declared type of a global register by register index.
+
+#### `Platform:get_related_platform(arch)` -> `Platform|nil`
+
+Return the related platform for a different architecture (e.g.
+the matching x86 platform from an x86_64 one), or `nil`.
+
+#### `Platform:related_platforms()` -> `table<Platform>`
+
+All related platforms.
+
+#### `Platform:get_associated_platform_by_address(addr)` -> `(platform, new_addr)`
+
+Return the platform that applies at a given address together with
+a possibly-adjusted address.
+
+#### `Platform:get_type_by_name(name)` -> `Type|nil`
+
+Look up a platform type by its qualified name string.
+
+#### `Platform:get_variable_by_name(name)` -> `Type|nil`
+
+Look up a platform variable type by its qualified name string.
+
+#### `Platform:get_function_by_name(name[, exact_match])` -> `Type|nil`
+
+Look up a platform function type. Defaults to a fuzzy match;
+pass `true` for exact matching.
+
+#### `Platform:get_system_call_name(n)` -> `string`
+
+Name of system call number `n`.
+
+#### `Platform:get_system_call_type(n)` -> `Type|nil`
+
+Function type of system call number `n`.
+
+### Static accessors
+
+#### `Platform.get_by_name(name)` -> `Platform|nil`
+
+Look up a platform by name.
+
+#### `Platform.list()` -> `table<Platform>`
+
+Return every registered platform.
+
+#### `Platform.list_by_arch(arch)` -> `table<Platform>`
+
+Registered platforms for the given architecture.
+
+#### `Platform.list_by_os(os)` -> `table<Platform>`
+
+Registered platforms for the given OS name (e.g. `"linux"`).
+
+#### `Platform.os_list()` -> `table<string>`
+
+All registered OS names.
+
 ---
 
 ## BinaryView
@@ -228,31 +1056,19 @@ if sym.type == "Function" then ... end
 
 Starting address of the binary view's address space
 
-**Aliases:** `start`
-
 **Example:**
 ```lua
 print(bv.start_addr)  -- e.g., 0x140000000
 ```
 
-#### `BinaryView.start` -> `HexAddress`
-
-Alias for start_addr
-
 #### `BinaryView.end_addr` -> `HexAddress`
 
 End address of the binary view (one past the last valid address)
-
-**Aliases:** `end`
 
 **Example:**
 ```lua
 print(bv.end_addr)
 ```
-
-#### `BinaryView.end` -> `HexAddress`
-
-Alias for end_addr (note: use bv["end"] since 'end' is a Lua keyword)
 
 #### `BinaryView.length` -> `integer`
 
@@ -263,28 +1079,35 @@ Total size of the binary in bytes
 print('Size:', bv.length, 'bytes')
 ```
 
-#### `BinaryView.file` -> `string`
+#### `BinaryView.filename` -> `string`
 
 Full path to the loaded binary file
 
-**Aliases:** `filename`
-
 **Example:**
 ```lua
-print('File:', bv.file)
+print('File:', bv.filename)
 ```
 
-#### `BinaryView.filename` -> `string`
+#### `BinaryView.arch` -> `Architecture`
 
-Alias for file property
-
-#### `BinaryView.arch` -> `string`
-
-Architecture name (e.g., 'x86_64', 'x86', 'armv7', 'aarch64', 'thumb2')
+Default architecture usertype for this binary view. Use `.name` for
+the string form (e.g. `"x86_64"`, `"aarch64"`, `"thumb2"`). See the
+Architecture section for the full read-only surface.
 
 **Example:**
 ```lua
-print('Architecture:', bv.arch)
+print('Architecture:', bv.arch.name)
+print('Pointer size:', bv.arch.address_size)
+```
+
+#### `BinaryView.platform` -> `Platform|nil`
+
+Default platform for this binary view, or `nil` if unset. See the
+Platform section for the read-only surface.
+
+**Example:**
+```lua
+print('Platform:', bv.platform and bv.platform.name or '<none>')
 ```
 
 #### `BinaryView.entry_point` -> `HexAddress`
@@ -685,7 +1508,7 @@ Get all code references TO the given address (who calls/jumps here?)
 
 **Example:**
 ```lua
-local refs = bv:get_code_refs(func.start.value)
+local refs = bv:get_code_refs(func.start_addr.value)
 print("Function is called from", #refs, "locations:")
 for _, ref in ipairs(refs) do
     print("  ", ref.addr, ref.func and ref.func.name or "")
@@ -737,7 +1560,7 @@ Get all call sites that call the function at the given address
 
 **Example:**
 ```lua
-local callers = bv:get_callers(func.start.value)
+local callers = bv:get_callers(func.start_addr.value)
 print("Called from", #callers, "locations:")
 for _, caller in ipairs(callers) do
     print("  ", caller.address, caller.func and caller.func.name or "")
@@ -795,6 +1618,14 @@ Get a tag type by its name
 **Parameters:**
 - `name` (string) - Name of the tag type to look up
 
+#### `BinaryView:get_tag_type_by_id(...)` -> `TagType|nil`
+
+Get a tag type by its unique ID string. Useful for persistent tag
+references that survive a rename.
+
+**Parameters:**
+- `id` (string) - Unique ID of the tag type
+
 #### `BinaryView:create_tag_type(...)` -> `TagType`
 
 Create a new tag type for annotating the binary
@@ -851,7 +1682,7 @@ Remove a tag from an address
 
 #### `BinaryView:create_user_tag(...)` -> `Tag|nil`
 
-Create and add a new tag at an address in one step
+Create and add a new user tag at an address in one step
 
 **Parameters:**
 - `addr` (HexAddress|integer) - Address to create tag at
@@ -861,6 +1692,23 @@ Create and add a new tag at an address in one step
 **Example:**
 ```lua
 bv:create_user_tag(here, "Vulnerability", "Buffer overflow in memcpy")
+```
+
+#### `BinaryView:create_auto_tag(...)` -> `Tag|nil`
+
+Create and add a new auto (analysis-generated) tag at an address
+in one step. Use this for tags produced by script-driven analysis
+passes; use `create_user_tag` for tags the user should see as
+hand-authored.
+
+**Parameters:**
+- `addr` (HexAddress|integer) - Address to create tag at
+- `tagTypeName` (string) - Name of the tag type (must already exist)
+- `data` (string) - Tag data/description
+
+**Example:**
+```lua
+bv:create_auto_tag(here, "Analysis", "Matched memset pattern")
 ```
 
 #### `BinaryView:get_all_tags(...)` -> `table<{addr: HexAddress, tag: Tag, auto: boolean, func: Function|nil}>`
@@ -891,7 +1739,7 @@ Get all tags within a specified address range
 
 **Example:**
 ```lua
-local tags = bv:get_tags_in_range(func.start, func["end"])
+local tags = bv:get_tags_in_range(func.start_addr, func.end_addr)
 for _, entry in ipairs(tags) do
     print(entry.addr, entry.tag.type.name, entry.tag.data)
 end
@@ -1193,26 +2041,19 @@ end
 
 Start address of the function
 
-**Aliases:** `start`
-
-#### `Function.start` -> `HexAddress`
-
-Start address of the function (preferred name)
-
 **Example:**
 ```lua
-print("Function starts at:", func.start)
+print("Function starts at:", func.start_addr)
 ```
 
 #### `Function.end_addr` -> `HexAddress`
 
 End address of the function (highest address in function)
 
-**Aliases:** `end, highest_addr`
-
-#### `Function.end` -> `HexAddress`
-
-End address of the function (use func["end"] since 'end' is a Lua keyword)
+**Example:**
+```lua
+print("Function ends at:", func.end_addr)
+```
 
 #### `Function.size` -> `integer`
 
@@ -1232,14 +2073,37 @@ Display name of the function
 print("Analyzing:", func.name)
 ```
 
-#### `Function.arch` -> `string`
+#### `Function.arch` -> `Architecture`
 
-Architecture name for this function (e.g., "x86_64", "thumb2")
+Architecture usertype for this function. Use `.name` for the string
+name (e.g. "x86_64", "thumb2") and see the Architecture section for
+the full read-only surface (registers, flags, decode helpers).
 
 **Example:**
 ```lua
-print("Architecture:", func.arch)
+print("Architecture:", func.arch.name)
+print("Pointer size:", func.arch.address_size)
 ```
+
+#### `Function.calling_convention` -> `CallingConvention|nil`
+
+Calling convention currently associated with the function, or `nil`
+if unset. See the CallingConvention section for the read-only
+surface.
+
+**Example:**
+```lua
+local cc = func.calling_convention
+if cc then
+    print(cc.name, "on", cc.arch.name,
+          "int args:", #cc.int_arg_regs)
+end
+```
+
+#### `Function.platform` -> `Platform|nil`
+
+Platform this function is analysed against, or `nil`. See the
+Platform section for the read-only surface.
 
 #### `Function.comment` -> `string`
 
@@ -1270,7 +2134,7 @@ BinaryView containing this function
 **Example:**
 ```lua
 local bv = func.view
-print("From file:", bv.file)
+print("From file:", bv.filename)
 ```
 
 #### `Function.auto_discovered` -> `boolean`
@@ -1322,15 +2186,6 @@ Whether the function can return normally (false for noreturn functions)
 if not func.can_return then
     print("This is a noreturn function")
 end
-```
-
-#### `Function.auto` -> `boolean`
-
-Whether this function was auto-discovered during analysis (same as auto_discovered)
-
-**Example:**
-```lua
-if func.auto then print("Auto-discovered function") end
 ```
 
 #### `Function.is_exported` -> `boolean`
@@ -1762,7 +2617,7 @@ Get the stack frame layout
 **Example:**
 ```lua
 for _, var in ipairs(func:stack_layout()) do
-    print(string.format("[%+d] %s: %s", var.offset, var.name, var.type))
+    print(string.format("[%+d] %s: %s", var.offset, var.name, var.type_name))
 end
 ```
 
@@ -1981,9 +2836,10 @@ Function containing this basic block
 print("In function:", bb.function.name)
 ```
 
-#### `BasicBlock.arch` -> `string`
+#### `BasicBlock.arch` -> `Architecture`
 
-Architecture name for this block
+Architecture usertype for this block. Use `.name` for the string
+form. See the Architecture section for the full read-only surface.
 
 #### `BasicBlock.can_exit` -> `boolean`
 
@@ -2190,9 +3046,10 @@ Full disassembly text including operands
 print(instr.text)  -- e.g., "mov eax, [rbp-0x8]"
 ```
 
-#### `Instruction.arch` -> `string`
+#### `Instruction.arch` -> `Architecture`
 
-Architecture of the instruction
+Architecture usertype for the instruction. Use `.name` for the
+string form.
 
 ### Methods
 
@@ -2250,20 +3107,14 @@ Name of the variable
 print("Variable:", var.name)
 ```
 
-#### `Variable.type` -> `string`
+#### `Variable.type_name` -> `string`
 
 Type name of the variable (e.g., "int", "char*")
 
-**Aliases:** `type_name`
-
 **Example:**
 ```lua
-print(var.name, ":", var.type)
+print(var.name, ":", var.type_name)
 ```
-
-#### `Variable.type_name` -> `string`
-
-Alias for type property
 
 #### `Variable.index` -> `integer`
 
@@ -2282,16 +3133,19 @@ end
 
 ### Methods
 
-#### `Variable:location(...)` -> `table<{type: string, register: string|nil, offset: integer|nil}>`
+#### `Variable:location(...)` -> `table<{type: string, offset: integer}>`
 
-Get the storage location of the variable
+Get the storage location of the variable. The `type` field uses
+the [BNVariableSourceType](#bnvariablesourcetype) short canonical
+form (`"local"` / `"register"` / `"flag"`), matching the vocabulary
+of `Variable.source_type`.
 
 **Example:**
 ```lua
 local loc = var:location()
-if loc.register then
-    print("In register:", loc.register)
-elseif loc.offset then
+if loc.type == "register" then
+    print("In register, storage:", loc.offset)
+elseif loc.type == "local" then
     print("Stack offset:", loc.offset)
 end
 ```
@@ -2667,11 +3521,15 @@ Height of the node
 
 Associated BasicBlock (if this node represents one)
 
-#### `FlowGraphNode.highlight` -> `table`
-
-Highlight color as {r, g, b, a} (0-255 values)
-
 ### Methods
+
+#### `FlowGraphNode:highlight()` -> `table`
+
+Get the node's highlight color as
+`{style, color, r, g, b, alpha}`. Bound as a method (colon-call)
+rather than a property to work around the sol2 3.3.0
+`sol::property+sol::this_state` MSVC crash shared with tasks
+#12 / #14 / #15.
 
 #### `FlowGraphNode:lines(...)` -> `table<string>`
 
@@ -3068,6 +3926,64 @@ print("Full type:", t:get_string())
 
 *Global utility functions available without a receiver object.
 *
+
+---
+
+## binjalua
+
+*Plugin-wide namespace table. Populated during
+`RegisterGlobalFunctions` from the version plumbing described in
+[`docs/versioning.md`](versioning.md) section 3. Scripts use this
+table for compatibility gating and introspection.*
+
+### Fields
+
+#### `binjalua.version` -> `string`
+
+Full version string of the currently loaded plugin in the form
+`"MAJOR.MINOR.PATCH"`. Build-time constant baked in by CMake from
+the `project(BinjaLua VERSION ...)` call; never changes after load.
+
+**Example:**
+```lua
+print("binja-lua", binjalua.version)
+```
+
+#### `binjalua.version_major` -> `integer`
+
+Major version component as a Lua integer. During the 0.y.z series
+this stays at 0 until the explicit 1.0.0 graduation; see
+[`docs/versioning.md`](versioning.md) section 1.2 for the
+graduation criteria.
+
+#### `binjalua.version_minor` -> `integer`
+
+Minor version component as a Lua integer. **In the pre-1.0 series
+this is the break marker:** a MINOR bump signals that at least one
+Lua-visible break landed in the release. Scripts that care about
+stability should pin to an exact MINOR.
+
+#### `binjalua.version_patch` -> `integer`
+
+Patch version component as a Lua integer. Additive-only in the
+pre-1.0 series.
+
+### Compatibility gating pattern
+
+```lua
+-- Require binja-lua 0.2.x or newer
+local want_major, want_minor = 0, 2
+if binjalua.version_major < want_major
+   or (binjalua.version_major == want_major
+       and binjalua.version_minor < want_minor) then
+    error("this script needs binja-lua " .. want_major .. "."
+          .. want_minor .. "+, running " .. binjalua.version)
+end
+```
+
+Until 1.0.0 ships, scripts should pin to an exact MINOR because
+MINOR is the break marker in the 0.y.z series. After 1.0.0,
+scripts can pin to MAJOR and treat MINOR as additive-only.
 
 ---
 
