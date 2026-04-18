@@ -23,7 +23,7 @@
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 project(BinjaLua
-    VERSION 0.2.0
+    VERSION 0.3.0
     LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)

@@ -13,6 +13,34 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
+- _nothing yet_
+
+### Changed
+
+- _nothing yet_
+
+### Fixed
+
+- _nothing yet_
+
+### Removed
+
+- _nothing yet_
+
+## [0.3.0] - unreleased
+
+Second release under the semver practice introduced in 0.2.0. Ships
+the R8 Settings binding, the R9.1 LLIL operand-walking wave, a C++20
+toolchain bump driven by BN header requirements, and a handful of
+documentation and helper additions. Pre-1.0 semver interprets 0.y.z
+MINOR bumps as "contains breaking changes" — `LLILFunction:instruction_at`
+now returns a live `LLILInstruction` usertype instead of the prior
+`{index = i}` table stub, so any script that reached into that stub
+will need to migrate to the new surface documented in
+`docs/api-reference.md`.
+
+### Added
+
 - **R9.1: `Function.llil` / `.mlil` / `.hlil` properties.** New
   sol::property accessors on `BinaryNinja.Function` mirroring the
   Python `Function.llil` / `.mlil` / `.hlil` surface at
@@ -354,7 +382,8 @@ base to compare against.
 
 - Initial public release.
 
-[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alecnunn/binja-lua/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/alecnunn/binja-lua/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alecnunn/binja-lua/releases/tag/v0.1.0
