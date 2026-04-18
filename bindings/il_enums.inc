@@ -1,0 +1,381 @@
+// Auto-generated from binaryninja-api/binaryninjacore.h.
+// Generator: scripts/generate_il_tables.py (local-only, NOT committed).
+// Do NOT hand-edit. Regenerate after bumping the BN submodule.
+//
+// Contents (commit 1 scope, R9.1 enums-only):
+//   - EnumToString / EnumFromString for BNLowLevelILOperation
+//     (143 enumerators from binaryninjacore.h:586-737).
+//   - EnumToString / EnumFromString for BNLowLevelILFlagCondition
+//     (22 enumerators from binaryninjacore.h:739-763: 14 integer +
+//     8 floating-point).
+//
+// Short-form vocabulary: mechanical prefix-strip + lowercase. So
+// LLIL_SET_REG -> "set_reg", LLIL_CMP_SLT -> "cmp_slt",
+// LLFC_E -> "e", LLFC_FUO -> "fuo". See
+// docs/il-metatable-design.md section 4.2 / 4.2a for the ratification.
+//
+// Dual-accept: EnumFromString accepts BOTH the short canonical form
+// AND the verbatim BN/Python enumerator name (e.g. "set_reg" or
+// "LLIL_SET_REG"). Case-sensitive match.
+//
+// This file is included by bindings/il_operand_conv.cpp inside the
+// BinjaLua namespace. It is a .inc fragment, not a standalone
+// translation unit.
+
+// ---- BNLowLevelILOperation ----
+
+inline const char* EnumToString(BNLowLevelILOperation v) {
+    switch (v) {
+        case LLIL_NOP: return "nop";
+        case LLIL_SET_REG: return "set_reg";
+        case LLIL_SET_REG_SPLIT: return "set_reg_split";
+        case LLIL_SET_FLAG: return "set_flag";
+        case LLIL_SET_REG_STACK_REL: return "set_reg_stack_rel";
+        case LLIL_REG_STACK_PUSH: return "reg_stack_push";
+        case LLIL_ASSERT: return "assert";
+        case LLIL_FORCE_VER: return "force_ver";
+        case LLIL_LOAD: return "load";
+        case LLIL_STORE: return "store";
+        case LLIL_PUSH: return "push";
+        case LLIL_POP: return "pop";
+        case LLIL_REG: return "reg";
+        case LLIL_REG_SPLIT: return "reg_split";
+        case LLIL_REG_STACK_REL: return "reg_stack_rel";
+        case LLIL_REG_STACK_POP: return "reg_stack_pop";
+        case LLIL_REG_STACK_FREE_REG: return "reg_stack_free_reg";
+        case LLIL_REG_STACK_FREE_REL: return "reg_stack_free_rel";
+        case LLIL_CONST: return "const";
+        case LLIL_CONST_PTR: return "const_ptr";
+        case LLIL_EXTERN_PTR: return "extern_ptr";
+        case LLIL_FLOAT_CONST: return "float_const";
+        case LLIL_FLAG: return "flag";
+        case LLIL_FLAG_BIT: return "flag_bit";
+        case LLIL_ADD: return "add";
+        case LLIL_ADC: return "adc";
+        case LLIL_SUB: return "sub";
+        case LLIL_SBB: return "sbb";
+        case LLIL_AND: return "and";
+        case LLIL_OR: return "or";
+        case LLIL_XOR: return "xor";
+        case LLIL_LSL: return "lsl";
+        case LLIL_LSR: return "lsr";
+        case LLIL_ASR: return "asr";
+        case LLIL_ROL: return "rol";
+        case LLIL_RLC: return "rlc";
+        case LLIL_ROR: return "ror";
+        case LLIL_RRC: return "rrc";
+        case LLIL_MUL: return "mul";
+        case LLIL_MULU_DP: return "mulu_dp";
+        case LLIL_MULS_DP: return "muls_dp";
+        case LLIL_DIVU: return "divu";
+        case LLIL_DIVU_DP: return "divu_dp";
+        case LLIL_DIVS: return "divs";
+        case LLIL_DIVS_DP: return "divs_dp";
+        case LLIL_MODU: return "modu";
+        case LLIL_MODU_DP: return "modu_dp";
+        case LLIL_MODS: return "mods";
+        case LLIL_MODS_DP: return "mods_dp";
+        case LLIL_NEG: return "neg";
+        case LLIL_NOT: return "not";
+        case LLIL_SX: return "sx";
+        case LLIL_ZX: return "zx";
+        case LLIL_LOW_PART: return "low_part";
+        case LLIL_JUMP: return "jump";
+        case LLIL_JUMP_TO: return "jump_to";
+        case LLIL_CALL: return "call";
+        case LLIL_CALL_STACK_ADJUST: return "call_stack_adjust";
+        case LLIL_TAILCALL: return "tailcall";
+        case LLIL_RET: return "ret";
+        case LLIL_NORET: return "noret";
+        case LLIL_IF: return "if";
+        case LLIL_GOTO: return "goto";
+        case LLIL_FLAG_COND: return "flag_cond";
+        case LLIL_FLAG_GROUP: return "flag_group";
+        case LLIL_CMP_E: return "cmp_e";
+        case LLIL_CMP_NE: return "cmp_ne";
+        case LLIL_CMP_SLT: return "cmp_slt";
+        case LLIL_CMP_ULT: return "cmp_ult";
+        case LLIL_CMP_SLE: return "cmp_sle";
+        case LLIL_CMP_ULE: return "cmp_ule";
+        case LLIL_CMP_SGE: return "cmp_sge";
+        case LLIL_CMP_UGE: return "cmp_uge";
+        case LLIL_CMP_SGT: return "cmp_sgt";
+        case LLIL_CMP_UGT: return "cmp_ugt";
+        case LLIL_TEST_BIT: return "test_bit";
+        case LLIL_BOOL_TO_INT: return "bool_to_int";
+        case LLIL_ADD_OVERFLOW: return "add_overflow";
+        case LLIL_SYSCALL: return "syscall";
+        case LLIL_BP: return "bp";
+        case LLIL_TRAP: return "trap";
+        case LLIL_INTRINSIC: return "intrinsic";
+        case LLIL_UNDEF: return "undef";
+        case LLIL_UNIMPL: return "unimpl";
+        case LLIL_UNIMPL_MEM: return "unimpl_mem";
+        case LLIL_FADD: return "fadd";
+        case LLIL_FSUB: return "fsub";
+        case LLIL_FMUL: return "fmul";
+        case LLIL_FDIV: return "fdiv";
+        case LLIL_FSQRT: return "fsqrt";
+        case LLIL_FNEG: return "fneg";
+        case LLIL_FABS: return "fabs";
+        case LLIL_FLOAT_TO_INT: return "float_to_int";
+        case LLIL_INT_TO_FLOAT: return "int_to_float";
+        case LLIL_FLOAT_CONV: return "float_conv";
+        case LLIL_ROUND_TO_INT: return "round_to_int";
+        case LLIL_FLOOR: return "floor";
+        case LLIL_CEIL: return "ceil";
+        case LLIL_FTRUNC: return "ftrunc";
+        case LLIL_FCMP_E: return "fcmp_e";
+        case LLIL_FCMP_NE: return "fcmp_ne";
+        case LLIL_FCMP_LT: return "fcmp_lt";
+        case LLIL_FCMP_LE: return "fcmp_le";
+        case LLIL_FCMP_GE: return "fcmp_ge";
+        case LLIL_FCMP_GT: return "fcmp_gt";
+        case LLIL_FCMP_O: return "fcmp_o";
+        case LLIL_FCMP_UO: return "fcmp_uo";
+        case LLIL_SET_REG_SSA: return "set_reg_ssa";
+        case LLIL_SET_REG_SSA_PARTIAL: return "set_reg_ssa_partial";
+        case LLIL_SET_REG_SPLIT_SSA: return "set_reg_split_ssa";
+        case LLIL_SET_REG_STACK_REL_SSA: return "set_reg_stack_rel_ssa";
+        case LLIL_SET_REG_STACK_ABS_SSA: return "set_reg_stack_abs_ssa";
+        case LLIL_REG_SPLIT_DEST_SSA: return "reg_split_dest_ssa";
+        case LLIL_REG_STACK_DEST_SSA: return "reg_stack_dest_ssa";
+        case LLIL_REG_SSA: return "reg_ssa";
+        case LLIL_REG_SSA_PARTIAL: return "reg_ssa_partial";
+        case LLIL_REG_SPLIT_SSA: return "reg_split_ssa";
+        case LLIL_REG_STACK_REL_SSA: return "reg_stack_rel_ssa";
+        case LLIL_REG_STACK_ABS_SSA: return "reg_stack_abs_ssa";
+        case LLIL_REG_STACK_FREE_REL_SSA: return "reg_stack_free_rel_ssa";
+        case LLIL_REG_STACK_FREE_ABS_SSA: return "reg_stack_free_abs_ssa";
+        case LLIL_SET_FLAG_SSA: return "set_flag_ssa";
+        case LLIL_ASSERT_SSA: return "assert_ssa";
+        case LLIL_FORCE_VER_SSA: return "force_ver_ssa";
+        case LLIL_FLAG_SSA: return "flag_ssa";
+        case LLIL_FLAG_BIT_SSA: return "flag_bit_ssa";
+        case LLIL_CALL_SSA: return "call_ssa";
+        case LLIL_SYSCALL_SSA: return "syscall_ssa";
+        case LLIL_TAILCALL_SSA: return "tailcall_ssa";
+        case LLIL_CALL_PARAM: return "call_param";
+        case LLIL_CALL_STACK_SSA: return "call_stack_ssa";
+        case LLIL_CALL_OUTPUT_SSA: return "call_output_ssa";
+        case LLIL_SEPARATE_PARAM_LIST_SSA: return "separate_param_list_ssa";
+        case LLIL_SHARED_PARAM_SLOT_SSA: return "shared_param_slot_ssa";
+        case LLIL_MEMORY_INTRINSIC_OUTPUT_SSA: return "memory_intrinsic_output_ssa";
+        case LLIL_LOAD_SSA: return "load_ssa";
+        case LLIL_STORE_SSA: return "store_ssa";
+        case LLIL_INTRINSIC_SSA: return "intrinsic_ssa";
+        case LLIL_MEMORY_INTRINSIC_SSA: return "memory_intrinsic_ssa";
+        case LLIL_REG_PHI: return "reg_phi";
+        case LLIL_REG_STACK_PHI: return "reg_stack_phi";
+        case LLIL_FLAG_PHI: return "flag_phi";
+        case LLIL_MEM_PHI: return "mem_phi";
+    }
+    return "unknown";
+}
+
+template <>
+inline std::optional<BNLowLevelILOperation> EnumFromString<BNLowLevelILOperation>(
+    const std::string& s) {
+    if (s == "nop" || s == "LLIL_NOP") return LLIL_NOP;
+    if (s == "set_reg" || s == "LLIL_SET_REG") return LLIL_SET_REG;
+    if (s == "set_reg_split" || s == "LLIL_SET_REG_SPLIT") return LLIL_SET_REG_SPLIT;
+    if (s == "set_flag" || s == "LLIL_SET_FLAG") return LLIL_SET_FLAG;
+    if (s == "set_reg_stack_rel" || s == "LLIL_SET_REG_STACK_REL") return LLIL_SET_REG_STACK_REL;
+    if (s == "reg_stack_push" || s == "LLIL_REG_STACK_PUSH") return LLIL_REG_STACK_PUSH;
+    if (s == "assert" || s == "LLIL_ASSERT") return LLIL_ASSERT;
+    if (s == "force_ver" || s == "LLIL_FORCE_VER") return LLIL_FORCE_VER;
+    if (s == "load" || s == "LLIL_LOAD") return LLIL_LOAD;
+    if (s == "store" || s == "LLIL_STORE") return LLIL_STORE;
+    if (s == "push" || s == "LLIL_PUSH") return LLIL_PUSH;
+    if (s == "pop" || s == "LLIL_POP") return LLIL_POP;
+    if (s == "reg" || s == "LLIL_REG") return LLIL_REG;
+    if (s == "reg_split" || s == "LLIL_REG_SPLIT") return LLIL_REG_SPLIT;
+    if (s == "reg_stack_rel" || s == "LLIL_REG_STACK_REL") return LLIL_REG_STACK_REL;
+    if (s == "reg_stack_pop" || s == "LLIL_REG_STACK_POP") return LLIL_REG_STACK_POP;
+    if (s == "reg_stack_free_reg" || s == "LLIL_REG_STACK_FREE_REG") return LLIL_REG_STACK_FREE_REG;
+    if (s == "reg_stack_free_rel" || s == "LLIL_REG_STACK_FREE_REL") return LLIL_REG_STACK_FREE_REL;
+    if (s == "const" || s == "LLIL_CONST") return LLIL_CONST;
+    if (s == "const_ptr" || s == "LLIL_CONST_PTR") return LLIL_CONST_PTR;
+    if (s == "extern_ptr" || s == "LLIL_EXTERN_PTR") return LLIL_EXTERN_PTR;
+    if (s == "float_const" || s == "LLIL_FLOAT_CONST") return LLIL_FLOAT_CONST;
+    if (s == "flag" || s == "LLIL_FLAG") return LLIL_FLAG;
+    if (s == "flag_bit" || s == "LLIL_FLAG_BIT") return LLIL_FLAG_BIT;
+    if (s == "add" || s == "LLIL_ADD") return LLIL_ADD;
+    if (s == "adc" || s == "LLIL_ADC") return LLIL_ADC;
+    if (s == "sub" || s == "LLIL_SUB") return LLIL_SUB;
+    if (s == "sbb" || s == "LLIL_SBB") return LLIL_SBB;
+    if (s == "and" || s == "LLIL_AND") return LLIL_AND;
+    if (s == "or" || s == "LLIL_OR") return LLIL_OR;
+    if (s == "xor" || s == "LLIL_XOR") return LLIL_XOR;
+    if (s == "lsl" || s == "LLIL_LSL") return LLIL_LSL;
+    if (s == "lsr" || s == "LLIL_LSR") return LLIL_LSR;
+    if (s == "asr" || s == "LLIL_ASR") return LLIL_ASR;
+    if (s == "rol" || s == "LLIL_ROL") return LLIL_ROL;
+    if (s == "rlc" || s == "LLIL_RLC") return LLIL_RLC;
+    if (s == "ror" || s == "LLIL_ROR") return LLIL_ROR;
+    if (s == "rrc" || s == "LLIL_RRC") return LLIL_RRC;
+    if (s == "mul" || s == "LLIL_MUL") return LLIL_MUL;
+    if (s == "mulu_dp" || s == "LLIL_MULU_DP") return LLIL_MULU_DP;
+    if (s == "muls_dp" || s == "LLIL_MULS_DP") return LLIL_MULS_DP;
+    if (s == "divu" || s == "LLIL_DIVU") return LLIL_DIVU;
+    if (s == "divu_dp" || s == "LLIL_DIVU_DP") return LLIL_DIVU_DP;
+    if (s == "divs" || s == "LLIL_DIVS") return LLIL_DIVS;
+    if (s == "divs_dp" || s == "LLIL_DIVS_DP") return LLIL_DIVS_DP;
+    if (s == "modu" || s == "LLIL_MODU") return LLIL_MODU;
+    if (s == "modu_dp" || s == "LLIL_MODU_DP") return LLIL_MODU_DP;
+    if (s == "mods" || s == "LLIL_MODS") return LLIL_MODS;
+    if (s == "mods_dp" || s == "LLIL_MODS_DP") return LLIL_MODS_DP;
+    if (s == "neg" || s == "LLIL_NEG") return LLIL_NEG;
+    if (s == "not" || s == "LLIL_NOT") return LLIL_NOT;
+    if (s == "sx" || s == "LLIL_SX") return LLIL_SX;
+    if (s == "zx" || s == "LLIL_ZX") return LLIL_ZX;
+    if (s == "low_part" || s == "LLIL_LOW_PART") return LLIL_LOW_PART;
+    if (s == "jump" || s == "LLIL_JUMP") return LLIL_JUMP;
+    if (s == "jump_to" || s == "LLIL_JUMP_TO") return LLIL_JUMP_TO;
+    if (s == "call" || s == "LLIL_CALL") return LLIL_CALL;
+    if (s == "call_stack_adjust" || s == "LLIL_CALL_STACK_ADJUST") return LLIL_CALL_STACK_ADJUST;
+    if (s == "tailcall" || s == "LLIL_TAILCALL") return LLIL_TAILCALL;
+    if (s == "ret" || s == "LLIL_RET") return LLIL_RET;
+    if (s == "noret" || s == "LLIL_NORET") return LLIL_NORET;
+    if (s == "if" || s == "LLIL_IF") return LLIL_IF;
+    if (s == "goto" || s == "LLIL_GOTO") return LLIL_GOTO;
+    if (s == "flag_cond" || s == "LLIL_FLAG_COND") return LLIL_FLAG_COND;
+    if (s == "flag_group" || s == "LLIL_FLAG_GROUP") return LLIL_FLAG_GROUP;
+    if (s == "cmp_e" || s == "LLIL_CMP_E") return LLIL_CMP_E;
+    if (s == "cmp_ne" || s == "LLIL_CMP_NE") return LLIL_CMP_NE;
+    if (s == "cmp_slt" || s == "LLIL_CMP_SLT") return LLIL_CMP_SLT;
+    if (s == "cmp_ult" || s == "LLIL_CMP_ULT") return LLIL_CMP_ULT;
+    if (s == "cmp_sle" || s == "LLIL_CMP_SLE") return LLIL_CMP_SLE;
+    if (s == "cmp_ule" || s == "LLIL_CMP_ULE") return LLIL_CMP_ULE;
+    if (s == "cmp_sge" || s == "LLIL_CMP_SGE") return LLIL_CMP_SGE;
+    if (s == "cmp_uge" || s == "LLIL_CMP_UGE") return LLIL_CMP_UGE;
+    if (s == "cmp_sgt" || s == "LLIL_CMP_SGT") return LLIL_CMP_SGT;
+    if (s == "cmp_ugt" || s == "LLIL_CMP_UGT") return LLIL_CMP_UGT;
+    if (s == "test_bit" || s == "LLIL_TEST_BIT") return LLIL_TEST_BIT;
+    if (s == "bool_to_int" || s == "LLIL_BOOL_TO_INT") return LLIL_BOOL_TO_INT;
+    if (s == "add_overflow" || s == "LLIL_ADD_OVERFLOW") return LLIL_ADD_OVERFLOW;
+    if (s == "syscall" || s == "LLIL_SYSCALL") return LLIL_SYSCALL;
+    if (s == "bp" || s == "LLIL_BP") return LLIL_BP;
+    if (s == "trap" || s == "LLIL_TRAP") return LLIL_TRAP;
+    if (s == "intrinsic" || s == "LLIL_INTRINSIC") return LLIL_INTRINSIC;
+    if (s == "undef" || s == "LLIL_UNDEF") return LLIL_UNDEF;
+    if (s == "unimpl" || s == "LLIL_UNIMPL") return LLIL_UNIMPL;
+    if (s == "unimpl_mem" || s == "LLIL_UNIMPL_MEM") return LLIL_UNIMPL_MEM;
+    if (s == "fadd" || s == "LLIL_FADD") return LLIL_FADD;
+    if (s == "fsub" || s == "LLIL_FSUB") return LLIL_FSUB;
+    if (s == "fmul" || s == "LLIL_FMUL") return LLIL_FMUL;
+    if (s == "fdiv" || s == "LLIL_FDIV") return LLIL_FDIV;
+    if (s == "fsqrt" || s == "LLIL_FSQRT") return LLIL_FSQRT;
+    if (s == "fneg" || s == "LLIL_FNEG") return LLIL_FNEG;
+    if (s == "fabs" || s == "LLIL_FABS") return LLIL_FABS;
+    if (s == "float_to_int" || s == "LLIL_FLOAT_TO_INT") return LLIL_FLOAT_TO_INT;
+    if (s == "int_to_float" || s == "LLIL_INT_TO_FLOAT") return LLIL_INT_TO_FLOAT;
+    if (s == "float_conv" || s == "LLIL_FLOAT_CONV") return LLIL_FLOAT_CONV;
+    if (s == "round_to_int" || s == "LLIL_ROUND_TO_INT") return LLIL_ROUND_TO_INT;
+    if (s == "floor" || s == "LLIL_FLOOR") return LLIL_FLOOR;
+    if (s == "ceil" || s == "LLIL_CEIL") return LLIL_CEIL;
+    if (s == "ftrunc" || s == "LLIL_FTRUNC") return LLIL_FTRUNC;
+    if (s == "fcmp_e" || s == "LLIL_FCMP_E") return LLIL_FCMP_E;
+    if (s == "fcmp_ne" || s == "LLIL_FCMP_NE") return LLIL_FCMP_NE;
+    if (s == "fcmp_lt" || s == "LLIL_FCMP_LT") return LLIL_FCMP_LT;
+    if (s == "fcmp_le" || s == "LLIL_FCMP_LE") return LLIL_FCMP_LE;
+    if (s == "fcmp_ge" || s == "LLIL_FCMP_GE") return LLIL_FCMP_GE;
+    if (s == "fcmp_gt" || s == "LLIL_FCMP_GT") return LLIL_FCMP_GT;
+    if (s == "fcmp_o" || s == "LLIL_FCMP_O") return LLIL_FCMP_O;
+    if (s == "fcmp_uo" || s == "LLIL_FCMP_UO") return LLIL_FCMP_UO;
+    if (s == "set_reg_ssa" || s == "LLIL_SET_REG_SSA") return LLIL_SET_REG_SSA;
+    if (s == "set_reg_ssa_partial" || s == "LLIL_SET_REG_SSA_PARTIAL") return LLIL_SET_REG_SSA_PARTIAL;
+    if (s == "set_reg_split_ssa" || s == "LLIL_SET_REG_SPLIT_SSA") return LLIL_SET_REG_SPLIT_SSA;
+    if (s == "set_reg_stack_rel_ssa" || s == "LLIL_SET_REG_STACK_REL_SSA") return LLIL_SET_REG_STACK_REL_SSA;
+    if (s == "set_reg_stack_abs_ssa" || s == "LLIL_SET_REG_STACK_ABS_SSA") return LLIL_SET_REG_STACK_ABS_SSA;
+    if (s == "reg_split_dest_ssa" || s == "LLIL_REG_SPLIT_DEST_SSA") return LLIL_REG_SPLIT_DEST_SSA;
+    if (s == "reg_stack_dest_ssa" || s == "LLIL_REG_STACK_DEST_SSA") return LLIL_REG_STACK_DEST_SSA;
+    if (s == "reg_ssa" || s == "LLIL_REG_SSA") return LLIL_REG_SSA;
+    if (s == "reg_ssa_partial" || s == "LLIL_REG_SSA_PARTIAL") return LLIL_REG_SSA_PARTIAL;
+    if (s == "reg_split_ssa" || s == "LLIL_REG_SPLIT_SSA") return LLIL_REG_SPLIT_SSA;
+    if (s == "reg_stack_rel_ssa" || s == "LLIL_REG_STACK_REL_SSA") return LLIL_REG_STACK_REL_SSA;
+    if (s == "reg_stack_abs_ssa" || s == "LLIL_REG_STACK_ABS_SSA") return LLIL_REG_STACK_ABS_SSA;
+    if (s == "reg_stack_free_rel_ssa" || s == "LLIL_REG_STACK_FREE_REL_SSA") return LLIL_REG_STACK_FREE_REL_SSA;
+    if (s == "reg_stack_free_abs_ssa" || s == "LLIL_REG_STACK_FREE_ABS_SSA") return LLIL_REG_STACK_FREE_ABS_SSA;
+    if (s == "set_flag_ssa" || s == "LLIL_SET_FLAG_SSA") return LLIL_SET_FLAG_SSA;
+    if (s == "assert_ssa" || s == "LLIL_ASSERT_SSA") return LLIL_ASSERT_SSA;
+    if (s == "force_ver_ssa" || s == "LLIL_FORCE_VER_SSA") return LLIL_FORCE_VER_SSA;
+    if (s == "flag_ssa" || s == "LLIL_FLAG_SSA") return LLIL_FLAG_SSA;
+    if (s == "flag_bit_ssa" || s == "LLIL_FLAG_BIT_SSA") return LLIL_FLAG_BIT_SSA;
+    if (s == "call_ssa" || s == "LLIL_CALL_SSA") return LLIL_CALL_SSA;
+    if (s == "syscall_ssa" || s == "LLIL_SYSCALL_SSA") return LLIL_SYSCALL_SSA;
+    if (s == "tailcall_ssa" || s == "LLIL_TAILCALL_SSA") return LLIL_TAILCALL_SSA;
+    if (s == "call_param" || s == "LLIL_CALL_PARAM") return LLIL_CALL_PARAM;
+    if (s == "call_stack_ssa" || s == "LLIL_CALL_STACK_SSA") return LLIL_CALL_STACK_SSA;
+    if (s == "call_output_ssa" || s == "LLIL_CALL_OUTPUT_SSA") return LLIL_CALL_OUTPUT_SSA;
+    if (s == "separate_param_list_ssa" || s == "LLIL_SEPARATE_PARAM_LIST_SSA") return LLIL_SEPARATE_PARAM_LIST_SSA;
+    if (s == "shared_param_slot_ssa" || s == "LLIL_SHARED_PARAM_SLOT_SSA") return LLIL_SHARED_PARAM_SLOT_SSA;
+    if (s == "memory_intrinsic_output_ssa" || s == "LLIL_MEMORY_INTRINSIC_OUTPUT_SSA") return LLIL_MEMORY_INTRINSIC_OUTPUT_SSA;
+    if (s == "load_ssa" || s == "LLIL_LOAD_SSA") return LLIL_LOAD_SSA;
+    if (s == "store_ssa" || s == "LLIL_STORE_SSA") return LLIL_STORE_SSA;
+    if (s == "intrinsic_ssa" || s == "LLIL_INTRINSIC_SSA") return LLIL_INTRINSIC_SSA;
+    if (s == "memory_intrinsic_ssa" || s == "LLIL_MEMORY_INTRINSIC_SSA") return LLIL_MEMORY_INTRINSIC_SSA;
+    if (s == "reg_phi" || s == "LLIL_REG_PHI") return LLIL_REG_PHI;
+    if (s == "reg_stack_phi" || s == "LLIL_REG_STACK_PHI") return LLIL_REG_STACK_PHI;
+    if (s == "flag_phi" || s == "LLIL_FLAG_PHI") return LLIL_FLAG_PHI;
+    if (s == "mem_phi" || s == "LLIL_MEM_PHI") return LLIL_MEM_PHI;
+    return std::nullopt;
+}
+
+// ---- BNLowLevelILFlagCondition ----
+
+inline const char* EnumToString(BNLowLevelILFlagCondition v) {
+    switch (v) {
+        case LLFC_E: return "e";
+        case LLFC_NE: return "ne";
+        case LLFC_SLT: return "slt";
+        case LLFC_ULT: return "ult";
+        case LLFC_SLE: return "sle";
+        case LLFC_ULE: return "ule";
+        case LLFC_SGE: return "sge";
+        case LLFC_UGE: return "uge";
+        case LLFC_SGT: return "sgt";
+        case LLFC_UGT: return "ugt";
+        case LLFC_NEG: return "neg";
+        case LLFC_POS: return "pos";
+        case LLFC_O: return "o";
+        case LLFC_NO: return "no";
+        case LLFC_FE: return "fe";
+        case LLFC_FNE: return "fne";
+        case LLFC_FLT: return "flt";
+        case LLFC_FLE: return "fle";
+        case LLFC_FGE: return "fge";
+        case LLFC_FGT: return "fgt";
+        case LLFC_FO: return "fo";
+        case LLFC_FUO: return "fuo";
+    }
+    return "unknown";
+}
+
+template <>
+inline std::optional<BNLowLevelILFlagCondition> EnumFromString<BNLowLevelILFlagCondition>(
+    const std::string& s) {
+    if (s == "e" || s == "LLFC_E") return LLFC_E;
+    if (s == "ne" || s == "LLFC_NE") return LLFC_NE;
+    if (s == "slt" || s == "LLFC_SLT") return LLFC_SLT;
+    if (s == "ult" || s == "LLFC_ULT") return LLFC_ULT;
+    if (s == "sle" || s == "LLFC_SLE") return LLFC_SLE;
+    if (s == "ule" || s == "LLFC_ULE") return LLFC_ULE;
+    if (s == "sge" || s == "LLFC_SGE") return LLFC_SGE;
+    if (s == "uge" || s == "LLFC_UGE") return LLFC_UGE;
+    if (s == "sgt" || s == "LLFC_SGT") return LLFC_SGT;
+    if (s == "ugt" || s == "LLFC_UGT") return LLFC_UGT;
+    if (s == "neg" || s == "LLFC_NEG") return LLFC_NEG;
+    if (s == "pos" || s == "LLFC_POS") return LLFC_POS;
+    if (s == "o" || s == "LLFC_O") return LLFC_O;
+    if (s == "no" || s == "LLFC_NO") return LLFC_NO;
+    if (s == "fe" || s == "LLFC_FE") return LLFC_FE;
+    if (s == "fne" || s == "LLFC_FNE") return LLFC_FNE;
+    if (s == "flt" || s == "LLFC_FLT") return LLFC_FLT;
+    if (s == "fle" || s == "LLFC_FLE") return LLFC_FLE;
+    if (s == "fge" || s == "LLFC_FGE") return LLFC_FGE;
+    if (s == "fgt" || s == "LLFC_FGT") return LLFC_FGT;
+    if (s == "fo" || s == "LLFC_FO") return LLFC_FO;
+    if (s == "fuo" || s == "LLFC_FUO") return LLFC_FUO;
+    return std::nullopt;
+}

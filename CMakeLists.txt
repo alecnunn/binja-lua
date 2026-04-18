@@ -136,6 +136,7 @@ set(BINDING_SOURCES
     bindings/types.cpp
     bindings/tag.cpp
     bindings/il.cpp
+    bindings/il_operand_conv.cpp
     bindings/flowgraph.cpp
     bindings/section.cpp
     bindings/symbol.cpp
