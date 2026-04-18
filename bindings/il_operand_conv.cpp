@@ -1,7 +1,7 @@
-// IL operand projection for binja-lua (LLIL scope, R9.1 commit 1).
+// IL operand projection for binja-lua (LLIL scope, R9.1).
 //
 // Value-usertype note (first-in-plugin): once the R9.1 instruction
-// usertype lands (commit 4 of the R9.1 wave), LLILInstruction will be
+// usertype lands (commit 3 of the R9.1 wave), LLILInstruction will be
 // the first non-Ref<T> value-semantics usertype registered in this
 // plugin. Every previous usertype wraps a BN Ref<T> through sol2's
 // unique_usertype_traits specialization in sol_config.h. BN's
@@ -24,30 +24,38 @@
 // See docs/session-state.md section 5 and docs/extension-plan.md
 // section 4.0 for the history.
 //
-// File layout (R9.1 commit 1 scope is ENUMS-ONLY):
-//   - bindings/il_enums.inc is the GENERATED fragment holding
+// File layout (R9.1 commit 2a adds the operand-spec table):
+//   - bindings/il_enums.inc is a GENERATED fragment holding
 //     EnumToString / EnumFromString for BNLowLevelILOperation (143)
 //     and BNLowLevelILFlagCondition (22). Produced by
-//     scripts/generate_il_tables.py (local-only, NOT committed).
-//     Regenerate after bumping the binaryninja-api submodule.
+//     scripts/generate_il_tables.py from binaryninjacore.h.
+//   - bindings/il_operands_table.inc is a GENERATED fragment holding
+//     the per-opcode LLILOperandSpec vectors plus the
+//     LLILOperandSpecsForOperation switch. Produced by the same
+//     generator from python/lowlevelil.py's per-subclass
+//     detailed_operands overrides.
+//   - bindings/il.h declares the LLILOperandSpec struct used by the
+//     operand table. Hand-written.
 //   - bindings/il_operand_conv.cpp (THIS file) is HAND-WRITTEN glue.
-//     Today it only #includes the generated fragment so the enum
-//     helpers link into the BinjaLua namespace. Later R9.1 commits
-//     will add LLILOperandToLua (operand projection dispatcher),
-//     BuildOperandsTable / BuildDetailedOperandsTable /
-//     BuildPrefixOperandsTable, and the traverse worker to this TU,
-//     plus an il_operands_table.inc fragment (commit 2) that
-//     dispatches (operation, operand_slot) to the per-operand spec.
+//     Today it #includes the two generated fragments inside the
+//     BinjaLua namespace so their symbols link correctly. Later R9.1
+//     commits (2b onwards) will add LLILOperandToLua (the type_tag
+//     dispatcher), BuildOperandsTable / BuildDetailedOperandsTable /
+//     BuildPrefixOperandsTable, an ArchFor helper, and the traverse
+//     worker.
 //
-// Do NOT hand-edit bindings/il_enums.inc. If the vocabulary needs to
-// change, patch scripts/generate_il_tables.py and re-run it; if an
-// enumerator needs to be added (new BN opcode), bump the BN submodule
-// and re-run the generator.
+// Do NOT hand-edit either .inc fragment. If the vocabulary needs to
+// change, patch scripts/generate_il_tables.py and re-run it. If an
+// enumerator is added (new BN opcode), bump the BN submodule and
+// re-run the generator.
 
 #include "common.h"
+#include "il.h"
 
 namespace BinjaLua {
 
 #include "il_enums.inc"
+
+#include "il_operands_table.inc"
 
 }  // namespace BinjaLua
