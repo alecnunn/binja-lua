@@ -13,6 +13,45 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
+- **R9.1: `LLILInstruction` value-usertype + operand walking**
+  (new files `bindings/il_operand_conv.cpp`, `bindings/il.h`;
+  generated `bindings/il_enums.inc` and
+  `bindings/il_operands_table.inc`; `bindings/il.cpp` grows
+  `RegisterLLILInstructionBindings`). Introduces
+  `BinaryNinja.LLILInstruction` as the FIRST non-`Ref<T>`
+  value-semantics usertype in the plugin. Mirrors the Python
+  `LowLevelILInstruction` surface at `python/lowlevelil.py:316`.
+  `LLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `instr_index`,
+  `source_operand`, `operation` (short canonical string, dual-accept
+  via `EnumFromString<BNLowLevelILOperation>` for the 143
+  enumerators), `function` (`Ref<LowLevelILFunction>`), `flags`,
+  `attributes`, `ssa_form` / `non_ssa_form` / `ssa_instr_index` /
+  `ssa_expr_index`, `has_mlil` / `has_mapped_mlil`, `text`.
+  Projection helpers: `operands` (1-indexed value list),
+  `detailed_operands` (1-indexed `{name, value, type}` tables),
+  `prefix_operands` (prefix-order flattened walk with
+  `{operation, size}` marker tables), `traverse(cb)` (depth-first
+  pre-order collector). Metamethods: `__eq` on
+  `(function, expr_index)`, `__tostring` as
+  `"<LLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 2c: `int`, `float`,
+  `expr`, `expr_list`, `int_list`, `reg`, `flag`, `reg_stack`,
+  `sem_class`, `sem_group`, `intrinsic`, `cond`, `target_map`,
+  `reg_stack_adjust`, `reg_ssa`, `reg_stack_ssa`,
+  `reg_stack_ssa_dest_and_src`, `flag_ssa`, `reg_ssa_list`,
+  `reg_stack_ssa_list`, `flag_ssa_list`, `reg_or_flag_list` and
+  `reg_or_flag_ssa_list` (discriminated `{kind, name}` entries),
+  `constraint` (R9.1 stub). `BNLowLevelILFlagCondition` (22
+  enumerators: 14 integer + 8 floating-point) round-trips via short
+  canonical strings (`"e"`, `"slt"`, `"fuo"`, ...). Sentinel register
+  id `0xffffffff` maps to nil on the Lua side. Generator at
+  `scripts/generate_il_tables.py` reads `binaryninjacore.h` +
+  `python/lowlevelil.py::ILOperations` to emit the enum vocabulary
+  and per-opcode operand spec dispatch; regeneration is manual on
+  each `binaryninja-api` submodule bump. Validation coverage in
+  `examples/validation/13_llil.lua`.
 - **R8: `Settings` binding (new file, `bindings/settings.cpp`).**
   Introduces the `BinaryNinja.Settings` usertype and the `Settings.new`
   static factory wrapping `Settings::Instance` at
