@@ -5,7 +5,9 @@ This guide covers building the plugin from source.
 ## Prerequisites
 
 - **CMake** 3.24 or newer
-- **C++17 compiler** (Clang recommended, MSVC and GCC also work)
+- **C++20 compiler** (MSVC 2022 17.0+, Clang 14+, or GCC 11+). Required
+  because `binaryninja-api/base/function_ref.h` uses C++20 `requires`
+  clauses and `std::remove_cvref_t`.
 - **Binary Ninja** with the API headers (included as a git submodule)
 
 Lua 5.4 and sol2 are fetched automatically during the CMake configure step.
