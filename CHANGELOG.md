@@ -13,6 +13,15 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
+- **R9.1: `Function.llil` / `.mlil` / `.hlil` properties.** New
+  sol::property accessors on `BinaryNinja.Function` mirroring the
+  Python `Function.llil` / `.mlil` / `.hlil` surface at
+  `python/function.py:1000` / `:1068` / `:1148`. Return
+  `Ref<LowLevelILFunction>` / `MediumLevelILFunction` /
+  `HighLevelILFunction` or `nil` when analysis has not produced the
+  corresponding IL. The existing `f:get_llil()` / `get_mlil()` /
+  `get_hlil()` method forms are retained; Python exposes both and
+  scripts written against the R8 pre-R9 surface keep working.
 - **R9.1: `LLILInstruction` value-usertype + operand walking**
   (new files `bindings/il_operand_conv.cpp`, `bindings/il.h`;
   generated `bindings/il_enums.inc` and

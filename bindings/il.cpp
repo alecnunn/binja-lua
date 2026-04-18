@@ -263,11 +263,19 @@ void RegisterLLILInstructionBindings(sol::state_view lua,
         "detailed_operands", &BuildLLILDetailedOperandsTable,
         "prefix_operands", &BuildLLILPrefixOperandsTable,
 
-        // SSA cross-form.
-        "ssa_form", [](const LowLevelILInstruction& i)
-            -> LowLevelILInstruction { return i.GetSSAForm(); },
-        "non_ssa_form", [](const LowLevelILInstruction& i)
-            -> LowLevelILInstruction { return i.GetNonSSAForm(); },
+        // SSA cross-form. Bound as sol::property so Lua scripts can
+        // dot-access them as read-only attributes (instr.ssa_form)
+        // matching Python's @property shape at
+        // python/lowlevelil.py. No sol::this_state here so the sol2
+        // 3.3.0 MSVC property+this_state landmine does not apply.
+        "ssa_form", sol::property(
+            [](const LowLevelILInstruction& i) -> LowLevelILInstruction {
+                return i.GetSSAForm();
+            }),
+        "non_ssa_form", sol::property(
+            [](const LowLevelILInstruction& i) -> LowLevelILInstruction {
+                return i.GetNonSSAForm();
+            }),
         "ssa_instr_index",
         [](const LowLevelILInstruction& i) -> size_t {
             return i.GetSSAInstructionIndex();
@@ -287,21 +295,27 @@ void RegisterLLILInstructionBindings(sol::state_view lua,
         },
 
         // Rendered instruction text. Same path as
-        // LLILFunction:get_text(i).
-        "text", [](const LowLevelILInstruction& i) -> std::string {
-            if (!i.function) return "";
-            Ref<Function> f = i.function->GetFunction();
-            if (!f) return "";
-            std::vector<InstructionTextToken> tokens;
-            if (i.function->GetInstructionText(
-                    f, f->GetArchitecture(),
-                    i.instructionIndex, tokens)) {
-                std::ostringstream ss;
-                for (const auto& t : tokens) ss << t.text;
-                return ss.str();
-            }
-            return "";
-        },
+        // LLILFunction:get_text(i). Bound as sol::property so Lua
+        // scripts read `instr.text` as a string (the pre-fix plain
+        // method form returned the bound Lua function on dot access,
+        // breaking 13_llil.lua's is_string assertion). No
+        // sol::this_state required, so the sol2 3.3.0 MSVC
+        // property+this_state landmine does not apply.
+        "text", sol::property(
+            [](const LowLevelILInstruction& i) -> std::string {
+                if (!i.function) return "";
+                Ref<Function> f = i.function->GetFunction();
+                if (!f) return "";
+                std::vector<InstructionTextToken> tokens;
+                if (i.function->GetInstructionText(
+                        f, f->GetArchitecture(),
+                        i.instructionIndex, tokens)) {
+                    std::ostringstream ss;
+                    for (const auto& t : tokens) ss << t.text;
+                    return ss.str();
+                }
+                return "";
+            }),
 
         // Depth-first pre-order walker. Matches Python's
         // LowLevelILInstruction.traverse.

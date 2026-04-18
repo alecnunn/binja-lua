@@ -643,7 +643,23 @@ void RegisterFunctionBindings(sol::state_view lua, Ref<Logger> logger) {
             f.MarkUpdatesRequired(UserFunctionUpdate);
         },
 
-        // IL accessors
+        // IL accessors. Python exposes both `.llil` (property) and
+        // the internal method form; we match by registering the
+        // canonical short properties plus their get_* method
+        // counterparts. Mirrors python/function.py:1000 (llil),
+        // :1068 (mlil), :1148 (hlil) which are all @property.
+        "llil", sol::property([](Function& f) -> Ref<LowLevelILFunction> {
+            return f.GetLowLevelIL();
+        }),
+        "mlil", sol::property(
+            [](Function& f) -> Ref<MediumLevelILFunction> {
+                return f.GetMediumLevelIL();
+            }),
+        "hlil", sol::property(
+            [](Function& f) -> Ref<HighLevelILFunction> {
+                return f.GetHighLevelIL();
+            }),
+
         "get_llil", [](Function& f) -> Ref<LowLevelILFunction> {
             return f.GetLowLevelIL();
         },
