@@ -130,6 +130,7 @@ set(BINDING_SOURCES
     bindings/function.cpp
     bindings/instruction.cpp
     bindings/platform.cpp
+    bindings/settings.cpp
     bindings/variable.cpp
     bindings/datavariable.cpp
     bindings/types.cpp

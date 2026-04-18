@@ -13,7 +13,30 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
-- _nothing yet_
+- **R8: `Settings` binding (new file, `bindings/settings.cpp`).**
+  Introduces the `BinaryNinja.Settings` usertype and the `Settings.new`
+  static factory wrapping `Settings::Instance` at
+  `binaryninja-api/binaryninjaapi.h:19286`. Mirrors the Python
+  `binaryninja.settings.Settings` surface at `python/settings.py:31`
+  with one method per scalar kind: `get_bool` / `get_double` /
+  `get_integer` / `get_string` / `get_string_list` / `get_json` (plus
+  matching `*_with_scope` variants that return `(value, scope_string)`
+  tuples) and `set_bool` / `set_double` / `set_integer` / `set_string`
+  / `set_string_list` / `set_json`. Every accessor takes an optional
+  `resource` argument that can be a `BinaryView`, a `Function`, or
+  nil, and an optional scope argument that dual-accepts the short
+  canonical form (`"default"`, `"user"`, `"project"`, `"resource"`,
+  `"auto"`, `"invalid"`) OR the verbatim `BNSettingsScope` enumerator
+  name (e.g. `"SettingsUserScope"`). Schema-side: `contains`, `keys`,
+  `is_empty`, `query_property_string`, `query_property_string_list`,
+  `register_group`, `register_setting`, `update_property`,
+  `deserialize_schema`, `serialize_schema`. Persistence:
+  `serialize_settings`, `deserialize_settings`, `reset`, `reset_all`,
+  `load_settings_file`, `set_resource_id`. Adds `SETTINGS_METATABLE`
+  in `bindings/common.h` and `EnumToString` /
+  `EnumFromString<BNSettingsScope>` specializations alongside the
+  existing R2 enum helpers. Validation coverage in
+  `examples/validation/12_settings.lua` (suite: 12 scripts).
 
 ### Changed
 
