@@ -1,10 +1,7 @@
 // IL binding declarations for binja-lua (LLIL / MLIL / HLIL wave).
 //
-// R9.1 commit 2a scope: LLILOperandSpec struct + forward declaration
-// of the per-opcode dispatch function. The helper definitions
-// (LLILOperandToLua / Build*OperandsTable / traverse worker) land in
-// a later commit; this header only exposes what il_operands_table.inc
-// needs to compile inside bindings/il_operand_conv.cpp.
+// R9.1 commit 2a: LLILOperandSpec struct + per-opcode dispatch
+// declaration. R9.1 commit 2b: projection helpers + traverse worker.
 //
 // MLIL and HLIL siblings (R9.2 / R9.3) will add MLILOperandSpec and
 // HLILOperandSpec structs here when they land.
@@ -12,6 +9,12 @@
 #pragma once
 
 #include "common.h"
+
+// Full definitions of LowLevelILInstruction and the LowLevelIL*List
+// container classes. binaryninjaapi.h only forward-declares them
+// (line 14052), so we need the full header to call GetRawOperandAs*
+// methods and to iterate the list containers.
+#include "lowlevelilinstruction.h"
 
 #include <cstdint>
 #include <vector>
@@ -45,5 +48,47 @@ struct LLILOperandSpec {
 // bindings/il_operands_table.inc.
 const std::vector<LLILOperandSpec>& LLILOperandSpecsForOperation(
     BNLowLevelILOperation op);
+
+// Resolve the owning Architecture for a LowLevelILInstruction, or
+// nullptr when the IL function has no attached BN Function (rare; only
+// occurs with synthetic IL). Every operand projector that turns a
+// register/flag/intrinsic slot into a name string goes through this
+// helper and returns nil on null.
+Ref<Architecture> ArchFor(const LowLevelILInstruction& instr);
+
+// Project a single operand spec to a Lua value following the type_tag
+// vocabulary at docs/il-metatable-design.md section 2c. Returns
+// sol::nil on architecture-unavailable / sentinel register id /
+// unknown tag. The custom "unknown" tag used by the 7 call-param
+// delegation sites (LLIL_CALL_SSA.params etc.) dispatches on
+// (spec.slot_first, spec.name) via ProjectUnknownField.
+sol::object LLILOperandToLua(sol::state_view lua,
+                              const LowLevelILInstruction& instr,
+                              const LLILOperandSpec& spec);
+
+// Build the 1-indexed `instr.operands` list: projects each operand
+// spec via LLILOperandToLua without the (name, type) wrapping.
+sol::table BuildLLILOperandsTable(sol::this_state ts,
+                                    const LowLevelILInstruction& instr);
+
+// Build the 1-indexed `instr.detailed_operands` list: each entry is
+// {name=..., value=..., type=...} matching Python's detailed_operands.
+sol::table BuildLLILDetailedOperandsTable(
+    sol::this_state ts, const LowLevelILInstruction& instr);
+
+// Build the prefix-order flattened walk of the expression tree.
+// Matches Python LowLevelILInstruction.prefix_operands at
+// python/lowlevelil.py:837. Each entry is either a
+// {operation=<short>, size=<int>} marker table or a projected operand
+// value (primitive, name string, nested instruction, etc.).
+sol::table BuildLLILPrefixOperandsTable(
+    sol::this_state ts, const LowLevelILInstruction& instr);
+
+// Depth-first pre-order walk. Invokes ``cb(sub_instr)`` at each node
+// and accumulates every non-nil return into a 1-indexed result table,
+// mirroring python/lowlevelil.py:741 traverse semantics.
+sol::table TraverseLLILInstruction(sol::this_state ts,
+                                    const LowLevelILInstruction& instr,
+                                    sol::function cb);
 
 }  // namespace BinjaLua
