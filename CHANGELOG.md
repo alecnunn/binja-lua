@@ -27,7 +27,7 @@ PATCH bump signals additive-only changes.
 
 - _nothing yet_
 
-## [0.3.1] - unreleased
+## [0.3.1] - 2026-04-18
 
 PATCH release under the semver policy in `docs/versioning.md` — the
 wave is strictly additive relative to v0.3.0 with no breaking changes
@@ -174,7 +174,7 @@ instruction-usertype family started in v0.3.0's R9.1 LLIL binding.
 
 - _nothing yet_
 
-## [0.3.0] - unreleased
+## [0.3.0] - 2026-04-18
 
 Second release under the semver practice introduced in 0.2.0. Ships
 the R8 Settings binding, the R9.1 LLIL operand-walking wave, a C++20
@@ -276,7 +276,7 @@ will need to migrate to the new surface documented in
 
 - _nothing yet_
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-04-18
 
 First release under the new semver practice. Captures every
 Lua-visible change that landed on `main` between `9a00ea6`
