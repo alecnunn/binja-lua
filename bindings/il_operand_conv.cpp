@@ -1,8 +1,8 @@
-// IL operand projection for binja-lua (LLIL + MLIL scope).
+// IL operand projection for binja-lua (LLIL + MLIL + HLIL scope).
 //
-// Value-usertype note: LLILInstruction and MLILInstruction are the
-// two non-Ref<T> value-semantics usertypes registered by this
-// plugin. Every other usertype wraps a BN Ref<T> through sol2's
+// Value-usertype note: LLILInstruction, MLILInstruction, and
+// HLILInstruction are the three non-Ref<T> value-semantics usertypes
+// registered by this plugin. Every other usertype wraps a BN Ref<T> through sol2's
 // unique_usertype_traits specialization in sol_config.h. BN's
 // LowLevelILInstruction and MediumLevelILInstruction are value
 // types that internally carry a Ref<LowLevelILFunction> /
@@ -823,6 +823,315 @@ sol::table TraverseMLILInstruction(sol::this_state ts,
     sol::table out = lua.create_table();
     int idx = 1;
     TraverseMLILRecursive(lua, out, idx, instr, cb);
+    return out;
+}
+
+// ============================================================
+// HLIL projection (R9.3 commit B).
+// ============================================================
+
+Ref<Architecture> ArchFor(const HighLevelILInstruction& instr) {
+    if (!instr.function) return Ref<Architecture>();
+    Ref<Function> f = instr.function->GetFunction();
+    if (!f) return Ref<Architecture>();
+    return f->GetArchitecture();
+}
+
+namespace {
+
+// Project a GotoLabel to {label_id, name}. Python's GotoLabel carries
+// (function, id) and lazy-resolves name via
+// BNGetGotoLabelName(source_function, id); we pre-resolve the name
+// eagerly here because Lua scripts have no way to dereference a
+// label_id back through a usertype without adding a GotoLabel wrapper,
+// which is more surface than the R9.3 scope justifies.
+sol::table GotoLabelToTable(sol::state_view lua,
+                             const HighLevelILInstruction& instr,
+                             uint64_t label_id) {
+    sol::table t = lua.create_table(0, 2);
+    t["label_id"] = static_cast<lua_Integer>(label_id);
+    std::string name;
+    if (instr.function) {
+        Ref<Function> f = instr.function->GetFunction();
+        if (f) {
+            name = f->GetGotoLabelName(label_id);
+        }
+    }
+    if (!name.empty()) {
+        t["name"] = name;
+    } else {
+        t["name"] = sol::lua_nil_t{};
+    }
+    return t;
+}
+
+// Project an HLIL expr_list slot. Parallel to LLIL/MLIL helpers.
+sol::table ProjectHLILExprList(sol::state_view lua,
+                                 const HighLevelILInstruction& instr,
+                                 size_t slot) {
+    sol::table t = lua.create_table();
+    int i = 1;
+    auto list = instr.GetRawOperandAsExprList(slot);
+    for (size_t k = 0; k < list.size(); ++k) {
+        t[i++] = list[k];
+    }
+    return t;
+}
+
+}  // namespace
+
+sol::object HLILOperandToLua(sol::state_view lua,
+                              const HighLevelILInstruction& instr,
+                              const HLILOperandSpec& spec) {
+    const std::string tag = spec.type_tag ? spec.type_tag : "";
+    const size_t slot = spec.slot_first;
+
+    if (tag == "int") {
+        uint64_t raw = instr.GetRawOperandAsInteger(slot);
+        return sol::make_object(lua,
+            static_cast<lua_Integer>(static_cast<int64_t>(raw)));
+    }
+    if (tag == "float") {
+        uint64_t raw = instr.GetRawOperandAsInteger(slot);
+        double d = 0.0;
+        if (instr.size == 4) {
+            float f = 0.0f;
+            uint32_t bits = static_cast<uint32_t>(raw & 0xffffffffu);
+            std::memcpy(&f, &bits, sizeof(f));
+            d = static_cast<double>(f);
+        } else {
+            std::memcpy(&d, &raw, sizeof(d));
+        }
+        return sol::make_object(lua, d);
+    }
+    if (tag == "expr") {
+        return sol::make_object(lua, instr.GetRawOperandAsExpr(slot));
+    }
+    if (tag == "expr_list") {
+        return sol::make_object(lua, ProjectHLILExprList(lua, instr, slot));
+    }
+    if (tag == "int_list") {
+        sol::table t = lua.create_table();
+        int i = 1;
+        auto list = instr.GetRawOperandAsIndexList(slot);
+        for (size_t k = 0; k < list.size(); ++k) {
+            t[i++] = static_cast<lua_Integer>(list[k]);
+        }
+        return sol::make_object(lua, t);
+    }
+    if (tag == "intrinsic") {
+        Ref<Architecture> arch = ArchFor(instr);
+        uint32_t idx = static_cast<uint32_t>(
+            instr.GetRawOperandAsInteger(slot) & 0xffffffffu);
+        if (!arch || idx == 0xffffffffu) {
+            return sol::make_object(lua, sol::lua_nil_t{});
+        }
+        return sol::make_object(lua, arch->GetIntrinsicName(idx));
+    }
+    if (tag == "var") {
+        // VariableToTable defined in the MLIL section above; same
+        // {source_type, index, storage} shape. R9.3 reuses it intact
+        // per spec section 13.3.
+        Variable v = instr.GetRawOperandAsVariable(slot);
+        return sol::make_object(lua, VariableToTable(lua, v));
+    }
+    if (tag == "var_ssa") {
+        SSAVariable ssa = instr.GetRawOperandAsSSAVariable(slot);
+        return sol::make_object(lua, SSAVariableToTable(lua, ssa));
+    }
+    if (tag == "var_ssa_list") {
+        sol::table t = lua.create_table();
+        int i = 1;
+        auto list = instr.GetRawOperandAsSSAVariableList(slot);
+        for (size_t k = 0; k < list.size(); ++k) {
+            t[i++] = SSAVariableToTable(lua, list[k]);
+        }
+        return sol::make_object(lua, t);
+    }
+    if (tag == "ConstantData") {
+        ConstantData cd = instr.GetRawOperandAsConstantData(slot);
+        return sol::make_object(lua, ConstantDataToTable(lua, cd));
+    }
+    if (tag == "label") {
+        uint64_t label_id = instr.GetRawOperandAsInteger(slot);
+        return sol::make_object(lua,
+            GotoLabelToTable(lua, instr, label_id));
+    }
+    if (tag == "member_index") {
+        // Python's _get_member_index returns None when the high bit
+        // of the raw operand is set, otherwise the raw value. Preserve
+        // that contract on the Lua side as nil vs integer.
+        uint64_t raw = instr.GetRawOperandAsInteger(slot);
+        if (raw & (1ULL << 63)) {
+            return sol::make_object(lua, sol::lua_nil_t{});
+        }
+        return sol::make_object(lua,
+            static_cast<lua_Integer>(static_cast<int64_t>(raw)));
+    }
+
+    // Unknown tag (includes LLIL/MLIL-only tags that generators should
+    // never emit for HLIL). Return nil so scripts can detect the gap.
+    return sol::make_object(lua, sol::lua_nil_t{});
+}
+
+sol::table BuildHLILOperandsTable(sol::this_state ts,
+                                    const HighLevelILInstruction& instr) {
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    const std::vector<HLILOperandSpec>& specs =
+        HLILOperandSpecsForOperation(instr.operation);
+    int i = 1;
+    for (const HLILOperandSpec& spec : specs) {
+        out[i++] = HLILOperandToLua(lua, instr, spec);
+    }
+    return out;
+}
+
+sol::table BuildHLILDetailedOperandsTable(
+    sol::this_state ts, const HighLevelILInstruction& instr) {
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    const std::vector<HLILOperandSpec>& specs =
+        HLILOperandSpecsForOperation(instr.operation);
+    int i = 1;
+    for (const HLILOperandSpec& spec : specs) {
+        sol::table entry = lua.create_table(0, 3);
+        entry["name"] = std::string(spec.name ? spec.name : "");
+        entry["type"] = std::string(spec.type_tag ? spec.type_tag : "");
+        entry["value"] = HLILOperandToLua(lua, instr, spec);
+        out[i++] = entry;
+    }
+    return out;
+}
+
+namespace {
+
+void AppendHLILPrefixOperands(sol::state_view lua, sol::table& out,
+                                int& idx,
+                                const HighLevelILInstruction& instr) {
+    sol::table marker = lua.create_table(0, 2);
+    marker["operation"] = std::string(EnumToString(instr.operation));
+    marker["size"] = static_cast<lua_Integer>(instr.size);
+    out[idx++] = marker;
+
+    const std::vector<HLILOperandSpec>& specs =
+        HLILOperandSpecsForOperation(instr.operation);
+    for (const HLILOperandSpec& spec : specs) {
+        const std::string tag = spec.type_tag ? spec.type_tag : "";
+        if (tag == "expr") {
+            HighLevelILInstruction nested =
+                instr.GetRawOperandAsExpr(spec.slot_first);
+            AppendHLILPrefixOperands(lua, out, idx, nested);
+        } else if (tag == "expr_list") {
+            auto list = instr.GetRawOperandAsExprList(spec.slot_first);
+            for (size_t k = 0; k < list.size(); ++k) {
+                HighLevelILInstruction nested = list[k];
+                AppendHLILPrefixOperands(lua, out, idx, nested);
+            }
+        } else {
+            out[idx++] = HLILOperandToLua(lua, instr, spec);
+        }
+    }
+}
+
+}  // namespace
+
+sol::table BuildHLILPrefixOperandsTable(
+    sol::this_state ts, const HighLevelILInstruction& instr) {
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    int idx = 1;
+    AppendHLILPrefixOperands(lua, out, idx, instr);
+    return out;
+}
+
+namespace {
+
+void TraverseHLILRecursive(sol::state_view lua, sol::table& results,
+                             int& idx,
+                             const HighLevelILInstruction& instr,
+                             sol::function& cb) {
+    sol::protected_function_result rv = cb(instr);
+    if (rv.valid()) {
+        sol::object result = rv;
+        if (result.get_type() != sol::type::nil) {
+            results[idx++] = result;
+        }
+    }
+    const std::vector<HLILOperandSpec>& specs =
+        HLILOperandSpecsForOperation(instr.operation);
+    for (const HLILOperandSpec& spec : specs) {
+        const std::string tag = spec.type_tag ? spec.type_tag : "";
+        if (tag == "expr") {
+            HighLevelILInstruction nested =
+                instr.GetRawOperandAsExpr(spec.slot_first);
+            TraverseHLILRecursive(lua, results, idx, nested, cb);
+        } else if (tag == "expr_list") {
+            auto list = instr.GetRawOperandAsExprList(spec.slot_first);
+            for (size_t k = 0; k < list.size(); ++k) {
+                HighLevelILInstruction nested = list[k];
+                TraverseHLILRecursive(lua, results, idx, nested, cb);
+            }
+        }
+    }
+}
+
+}  // namespace
+
+sol::table TraverseHLILInstruction(sol::this_state ts,
+                                    const HighLevelILInstruction& instr,
+                                    sol::function cb) {
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    int idx = 1;
+    TraverseHLILRecursive(lua, out, idx, instr, cb);
+    return out;
+}
+
+sol::table GetHLILChildren(sol::this_state ts,
+                            const HighLevelILInstruction& instr) {
+    // The flat union of operand slots tagged "expr" or "expr_list",
+    // preserving operand order. Mirrors the HLIL tree-shape convention
+    // at docs/il-metatable-design.md section 13.4.
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    int idx = 1;
+    const std::vector<HLILOperandSpec>& specs =
+        HLILOperandSpecsForOperation(instr.operation);
+    for (const HLILOperandSpec& spec : specs) {
+        const std::string tag = spec.type_tag ? spec.type_tag : "";
+        if (tag == "expr") {
+            out[idx++] = instr.GetRawOperandAsExpr(spec.slot_first);
+        } else if (tag == "expr_list") {
+            auto list = instr.GetRawOperandAsExprList(spec.slot_first);
+            for (size_t k = 0; k < list.size(); ++k) {
+                out[idx++] = list[k];
+            }
+        }
+    }
+    return out;
+}
+
+sol::table GetHLILAncestors(sol::this_state ts,
+                             const HighLevelILInstruction& instr) {
+    // Climb via HasParent() / GetParent() until we hit the root. The
+    // first entry is the immediate parent (not self); matches Python's
+    // ancestor-iteration semantics (see
+    // docs/il-metatable-design.md section 13.4). A finite cap defends
+    // against corrupt analysis state where the parent chain could
+    // loop; 4096 is comfortably larger than any real-world nesting
+    // depth.
+    sol::state_view lua(ts);
+    sol::table out = lua.create_table();
+    int idx = 1;
+    HighLevelILInstruction cur = instr;
+    constexpr int kAncestorWalkLimit = 4096;
+    int steps = 0;
+    while (cur.HasParent() && steps < kAncestorWalkLimit) {
+        cur = cur.GetParent();
+        out[idx++] = cur;
+        ++steps;
+    }
     return out;
 }
 

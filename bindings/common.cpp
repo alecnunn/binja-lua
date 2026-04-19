@@ -82,6 +82,11 @@ void RegisterAllBindings(lua_State* L, Ref<Logger> logger) {
     // above because instruction.il_function returns
     // Ref<MediumLevelILFunction>. R9.2 addition.
     RegisterMLILInstructionBindings(lua, logger);
+    // HLIL instruction usertype - depends on HLIL function binding
+    // above and on the MLIL instruction usertype because
+    // HLILInstruction.mlil returns a MediumLevelILInstruction
+    // value-usertype (HLIL -> MLIL cross-reference). R9.3 addition.
+    RegisterHLILInstructionBindings(lua, logger);
 
     // 6. Type system
     RegisterTypeBindings(lua, logger);

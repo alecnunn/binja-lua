@@ -173,12 +173,46 @@ void RegisterILBindings(sol::state_view lua, Ref<Logger> logger) {
             return il.GetFunction();
         },
 
-        "instruction_at", [](sol::this_state ts, HighLevelILFunction& il, size_t index) -> sol::object {
+        // Replaces the R9.0 stub that returned {index = N}. Returns
+        // a BinaryNinja.HLILInstruction usertype registered by
+        // RegisterHLILInstructionBindings (see this file). Same
+        // out-of-range nil contract as LLIL/MLIL.
+        "instruction_at",
+        [](sol::this_state ts, HighLevelILFunction& il, size_t index)
+            -> sol::object {
             sol::state_view lua(ts);
-            if (index >= il.GetInstructionCount()) return sol::nil;
-            sol::table result = lua.create_table();
-            result["index"] = index;
-            return result;
+            if (index >= il.GetInstructionCount()) {
+                return sol::make_object(lua, sol::lua_nil_t{});
+            }
+            return sol::make_object(lua, il[index]);
+        },
+
+        // HLIL-unique: expose the AST root expression. HLIL functions
+        // carry a single AST root (unlike LLIL/MLIL's flat instruction
+        // list), so scripts that want to walk the entire function's
+        // tree usually start here. Parallel to the C++ surface at
+        // binaryninjaapi.h:15917. Python intentionally does not expose
+        // this (users walk via ancestors() / get_expr per
+        // py-researcher-2's #34 refresh), but the C++ entry saves
+        // scripts from ancestor-walks.
+        "root",
+        [](HighLevelILFunction& il) -> HighLevelILInstruction {
+            return il.GetRootExpr();
+        },
+
+        // Flat expression-index accessor. Parallel to Python
+        // HighLevelILFunction.get_expr at python/highlevelil.py:2940.
+        // `as_ast` toggles between expression-context and AST-walking
+        // views; defaults to true matching the BN C++ default.
+        "get_expr",
+        [](sol::this_state ts, HighLevelILFunction& il, size_t expr_idx,
+           sol::optional<bool> as_ast) -> sol::object {
+            sol::state_view lua(ts);
+            if (expr_idx >= il.GetExprCount()) {
+                return sol::make_object(lua, sol::lua_nil_t{});
+            }
+            bool full = as_ast.value_or(true);
+            return sol::make_object(lua, il.GetExpr(expr_idx, full));
         },
 
         "get_text", [](HighLevelILFunction& il, size_t index) -> std::string {
@@ -462,6 +496,184 @@ void RegisterMLILInstructionBindings(sol::state_view lua,
     );
 
     if (logger) logger->LogDebug("MLILInstruction bindings registered");
+}
+
+void RegisterHLILInstructionBindings(sol::state_view lua,
+                                      Ref<Logger> logger) {
+    if (logger) logger->LogDebug("Registering HLILInstruction bindings");
+
+    // Third value-usertype in the plugin after LLILInstruction and
+    // MLILInstruction. sol2 stores HighLevelILInstruction by value;
+    // the internal Ref<HighLevelILFunction> pins the owning IL
+    // function. See bindings/il_operand_conv.cpp for the family-wide
+    // value-usertype note.
+    //
+    // sol2 3.3.0 + MSVC HARD RULE: projection + tree-navigation
+    // helpers that need sol::this_state bind as METHODS, never as
+    // sol::property. The same rule applies to MLIL/LLIL.
+    //
+    // Property set differs from LLIL/MLIL per spec section 13.5:
+    //   - No flags, instr_index, has_mlil, has_mapped_mlil,
+    //     ssa_instr_index (HLIL concepts differ).
+    //   - Adds parent (Ref<HLILInstruction> or nil), as_ast / ast /
+    //     non_ast booleans, :children() / :ancestors() tree-nav
+    //     methods, .mlil / :mlils() HLIL->MLIL cross-references.
+    //   - No direct .llil: the two-hop chain is intentional per the
+    //     Python policy at python/mediumlevelil.py:697.
+    lua.new_usertype<HighLevelILInstruction>(HLIL_INSTRUCTION_METATABLE,
+        sol::no_constructor,
+
+        // Scalar fields from the BN struct base.
+        "size", &HighLevelILInstruction::size,
+        "expr_index", &HighLevelILInstruction::exprIndex,
+        "source_operand", &HighLevelILInstruction::sourceOperand,
+        "attributes", &HighLevelILInstruction::attributes,
+
+        // Address wrapped in HexAddress for consistent printing.
+        "address", sol::property(
+            [](const HighLevelILInstruction& i) -> HexAddress {
+                return HexAddress(i.address);
+            }),
+
+        // Short canonical lowercase-underscore opcode name. Python
+        // parity: HLIL_ASSIGN -> "assign".
+        "operation", sol::property(
+            [](const HighLevelILInstruction& i) -> std::string {
+                return std::string(EnumToString(i.operation));
+            }),
+
+        // Owning IL function as an existing Ref<T> usertype. Same
+        // `il_function` naming convention as LLIL/MLIL (dodges the
+        // Lua `function` reserved-word collision).
+        "il_function", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> Ref<HighLevelILFunction> { return i.function; }),
+
+        // AST / non-AST context fields. Scalar booleans and
+        // scalar-returning projections; no sol::this_state needed.
+        "as_ast", sol::property(
+            [](const HighLevelILInstruction& i) -> bool {
+                return i.ast;
+            }),
+        "ast", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> HighLevelILInstruction { return i.AsAST(); }),
+        "non_ast", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> HighLevelILInstruction { return i.AsNonAST(); }),
+
+        // Tree-navigation scalar property. sol2 marshals
+        // std::optional<T> as T or nil automatically, so we can keep
+        // this as a sol::property without triggering the MSVC 3.3.0
+        // landmine (never combine sol::property with sol::this_state).
+        // Returns nil when HasParent() is false (root / detached).
+        "parent", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> std::optional<HighLevelILInstruction> {
+                if (!i.HasParent()) return std::nullopt;
+                return i.GetParent();
+            }),
+
+        // Cross-references to MLIL. HLIL.mlil returns an
+        // MLILInstruction usertype when HasMediumLevelIL() is true;
+        // nil otherwise. HLIL has no direct .llil accessor per spec
+        // section 13.5; scripts walk via hlil.mlil.low_level_il.
+        // std::optional marshalling keeps this off the sol::property +
+        // sol::this_state landmine.
+        "mlil", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> std::optional<MediumLevelILInstruction> {
+                if (!i.HasMediumLevelIL()) return std::nullopt;
+                return i.GetMediumLevelIL();
+            }),
+
+        // Operand-projection accessors + tree-nav methods.
+        // sol::this_state-carrying methods, so bound as plain methods
+        // per the hard rule.
+        "operands", &BuildHLILOperandsTable,
+        "detailed_operands", &BuildHLILDetailedOperandsTable,
+        "prefix_operands", &BuildHLILPrefixOperandsTable,
+        "traverse", &TraverseHLILInstruction,
+        "children", &GetHLILChildren,
+        "ancestors", &GetHLILAncestors,
+
+        // Multi-result cross-references to MLIL. Python
+        // HLILInstruction.mlils at python/highlevelil.py:578 returns
+        // the full set of MLIL expressions that map back to this HLIL
+        // expression; scripts use it to cover MLIL expansion fan-out
+        // that the scalar .mlil accessor hides. We walk
+        // HighLevelILFunction.GetMediumLevelILExprIndexes and
+        // materialize each MLIL expression via GetExpr on the owning
+        // MLIL function.
+        "mlils",
+        [](sol::this_state ts, const HighLevelILInstruction& i)
+            -> sol::table {
+            sol::state_view lua(ts);
+            sol::table out = lua.create_table();
+            if (!i.function) return out;
+            std::set<size_t> idxs =
+                i.function->GetMediumLevelILExprIndexes(i.exprIndex);
+            Ref<MediumLevelILFunction> mlil_fn =
+                i.function->GetMediumLevelIL();
+            if (!mlil_fn) return out;
+            int out_idx = 1;
+            for (size_t mlil_expr : idxs) {
+                out[out_idx++] = mlil_fn->GetExpr(mlil_expr);
+            }
+            return out;
+        },
+
+        // SSA cross-form. No sol::this_state, so sol::property is
+        // safe. ssa_expr_index bound as plain method with zero args;
+        // sol2 auto-invokes zero-arg methods on property access.
+        "ssa_form", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> HighLevelILInstruction { return i.GetSSAForm(); }),
+        "non_ssa_form", sol::property(
+            [](const HighLevelILInstruction& i)
+                -> HighLevelILInstruction {
+                return i.GetNonSSAForm();
+            }),
+        "ssa_expr_index",
+        [](const HighLevelILInstruction& i) -> size_t {
+            return i.GetSSAExprIndex();
+        },
+
+        // Rendered instruction text. HLIL text rendering goes through
+        // GetExprText on the owning IL function; join the
+        // DisassemblyTextLine tokens with newlines the same way the
+        // HLIL function-level get_text does. sol::property-wrapped.
+        "text", sol::property(
+            [](const HighLevelILInstruction& i) -> std::string {
+                if (!i.function) return "";
+                std::vector<DisassemblyTextLine> lines =
+                    i.function->GetExprText(i);
+                std::ostringstream ss;
+                bool first = true;
+                for (const auto& line : lines) {
+                    if (!first) ss << "\n";
+                    for (const auto& tok : line.tokens) ss << tok.text;
+                    first = false;
+                }
+                return ss.str();
+            }),
+
+        // Metamethods.
+        sol::meta_function::equal_to,
+        [](const HighLevelILInstruction& a,
+           const HighLevelILInstruction& b) -> bool {
+            return a.function.GetPtr() == b.function.GetPtr() &&
+                   a.exprIndex == b.exprIndex;
+        },
+
+        sol::meta_function::to_string,
+        [](const HighLevelILInstruction& i) -> std::string {
+            return fmt::format("<HLILInstruction {} @0x{:x}>",
+                               EnumToString(i.operation), i.address);
+        }
+    );
+
+    if (logger) logger->LogDebug("HLILInstruction bindings registered");
 }
 
 } // namespace BinjaLua

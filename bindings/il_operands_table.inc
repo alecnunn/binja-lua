@@ -1633,3 +1633,691 @@ const std::vector<MLILOperandSpec>& MLILOperandSpecsForOperation(BNMediumLevelIL
         default: return kMLILOperandSpecsEmpty;
     }
 }
+
+// ---- BNHighLevelILOperation operand specs ----
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecsEmpty{};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_BLOCK{
+    {"body", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_IF{
+    {"condition", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"true", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"false", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_WHILE{
+    {"condition", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"body", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DO_WHILE{
+    {"body", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"condition", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FOR{
+    {"init", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"condition", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"update", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"body", "expr", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SWITCH{
+    {"condition", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"default", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"cases", "expr_list", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CASE{
+    {"values", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"body", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_JUMP{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_RET{
+    {"src", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_GOTO{
+    {"target", "label", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_LABEL{
+    {"target", "label", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR_DECLARE{
+    {"var", "var", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR_INIT{
+    {"dest", "var", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ASSIGN{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ASSIGN_UNPACK{
+    {"dest", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR{
+    {"var", "var", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_STRUCT_FIELD{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"offset", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"member_index", "member_index", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ARRAY_INDEX{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"index", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SPLIT{
+    {"high", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"low", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DEREF{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DEREF_FIELD{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"offset", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"member_index", "member_index", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ADDRESS_OF{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CONST{
+    {"constant", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CONST_DATA{
+    {"constant", "ConstantData", static_cast<uint8_t>(0), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CONST_PTR{
+    {"constant", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_EXTERN_PTR{
+    {"constant", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"offset", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FLOAT_CONST{
+    {"constant", "float", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_IMPORT{
+    {"constant", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ADD{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ADC{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"carry", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SUB{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SBB{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"carry", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_AND{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_OR{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_XOR{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_LSL{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_LSR{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ASR{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ROL{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_RLC{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"carry", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ROR{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"carry", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_RRC{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"carry", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MUL{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MULU_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MULS_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DIVU{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DIVU_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DIVS{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DIVS_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MODU{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MODU_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MODS{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MODS_DP{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_NEG{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_NOT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SX{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ZX{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_LOW_PART{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CALL{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"params", "expr_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_E{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_NE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_SLT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_ULT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_SLE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_ULE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_SGE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_UGE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_SGT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CMP_UGT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_TEST_BIT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_BOOL_TO_INT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ADD_OVERFLOW{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SYSCALL{
+    {"params", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_TAILCALL{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"params", "expr_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_INTRINSIC{
+    {"intrinsic", "intrinsic", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"params", "expr_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_TRAP{
+    {"vector", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_UNIMPL_MEM{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FADD{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FSUB{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FMUL{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FDIV{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FSQRT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FNEG{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FABS{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FLOAT_TO_INT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_INT_TO_FLOAT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FLOAT_CONV{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ROUND_TO_INT{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FLOOR{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CEIL{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FTRUNC{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_E{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_NE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_LT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_LE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_GE{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_GT{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_O{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FCMP_UO{
+    {"left", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"right", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_WHILE_SSA{
+    {"condition_phi", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"condition", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"body", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DO_WHILE_SSA{
+    {"body", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"condition_phi", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"condition", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_FOR_SSA{
+    {"init", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"condition_phi", "expr", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"condition", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"update", "expr", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+    {"body", "expr", static_cast<uint8_t>(4), static_cast<uint8_t>(4)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR_INIT_SSA{
+    {"dest", "var_ssa", static_cast<uint8_t>(0), static_cast<uint8_t>(1)},
+    {"src", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ASSIGN_MEM_SSA{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"dest_memory", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"src", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"src_memory", "int", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ASSIGN_UNPACK_MEM_SSA{
+    {"dest", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"dest_memory", "int", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"src", "expr", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+    {"src_memory", "int", static_cast<uint8_t>(4), static_cast<uint8_t>(4)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR_SSA{
+    {"var", "var_ssa", static_cast<uint8_t>(0), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_ARRAY_INDEX_SSA{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src_memory", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"index", "expr", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DEREF_SSA{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src_memory", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_DEREF_FIELD_SSA{
+    {"src", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src_memory", "int", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"offset", "int", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"member_index", "member_index", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_CALL_SSA{
+    {"dest", "expr", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"params", "expr_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"dest_memory", "int", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+    {"src_memory", "int", static_cast<uint8_t>(4), static_cast<uint8_t>(4)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_SYSCALL_SSA{
+    {"params", "expr_list", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"dest_memory", "int", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+    {"src_memory", "int", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_INTRINSIC_SSA{
+    {"intrinsic", "intrinsic", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"params", "expr_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+    {"dest_memory", "int", static_cast<uint8_t>(3), static_cast<uint8_t>(3)},
+    {"src_memory", "int", static_cast<uint8_t>(4), static_cast<uint8_t>(4)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_VAR_PHI{
+    {"dest", "var_ssa", static_cast<uint8_t>(0), static_cast<uint8_t>(1)},
+    {"src", "var_ssa_list", static_cast<uint8_t>(2), static_cast<uint8_t>(2)},
+};
+
+static const std::vector<HLILOperandSpec> kHLILOperandSpecs_HLIL_MEM_PHI{
+    {"dest", "int", static_cast<uint8_t>(0), static_cast<uint8_t>(0)},
+    {"src", "int_list", static_cast<uint8_t>(1), static_cast<uint8_t>(1)},
+};
+
+const std::vector<HLILOperandSpec>& HLILOperandSpecsForOperation(BNHighLevelILOperation op) {
+    switch (op) {
+        case HLIL_BLOCK: return kHLILOperandSpecs_HLIL_BLOCK;
+        case HLIL_IF: return kHLILOperandSpecs_HLIL_IF;
+        case HLIL_WHILE: return kHLILOperandSpecs_HLIL_WHILE;
+        case HLIL_DO_WHILE: return kHLILOperandSpecs_HLIL_DO_WHILE;
+        case HLIL_FOR: return kHLILOperandSpecs_HLIL_FOR;
+        case HLIL_SWITCH: return kHLILOperandSpecs_HLIL_SWITCH;
+        case HLIL_CASE: return kHLILOperandSpecs_HLIL_CASE;
+        case HLIL_JUMP: return kHLILOperandSpecs_HLIL_JUMP;
+        case HLIL_RET: return kHLILOperandSpecs_HLIL_RET;
+        case HLIL_GOTO: return kHLILOperandSpecs_HLIL_GOTO;
+        case HLIL_LABEL: return kHLILOperandSpecs_HLIL_LABEL;
+        case HLIL_VAR_DECLARE: return kHLILOperandSpecs_HLIL_VAR_DECLARE;
+        case HLIL_VAR_INIT: return kHLILOperandSpecs_HLIL_VAR_INIT;
+        case HLIL_ASSIGN: return kHLILOperandSpecs_HLIL_ASSIGN;
+        case HLIL_ASSIGN_UNPACK: return kHLILOperandSpecs_HLIL_ASSIGN_UNPACK;
+        case HLIL_VAR: return kHLILOperandSpecs_HLIL_VAR;
+        case HLIL_STRUCT_FIELD: return kHLILOperandSpecs_HLIL_STRUCT_FIELD;
+        case HLIL_ARRAY_INDEX: return kHLILOperandSpecs_HLIL_ARRAY_INDEX;
+        case HLIL_SPLIT: return kHLILOperandSpecs_HLIL_SPLIT;
+        case HLIL_DEREF: return kHLILOperandSpecs_HLIL_DEREF;
+        case HLIL_DEREF_FIELD: return kHLILOperandSpecs_HLIL_DEREF_FIELD;
+        case HLIL_ADDRESS_OF: return kHLILOperandSpecs_HLIL_ADDRESS_OF;
+        case HLIL_CONST: return kHLILOperandSpecs_HLIL_CONST;
+        case HLIL_CONST_DATA: return kHLILOperandSpecs_HLIL_CONST_DATA;
+        case HLIL_CONST_PTR: return kHLILOperandSpecs_HLIL_CONST_PTR;
+        case HLIL_EXTERN_PTR: return kHLILOperandSpecs_HLIL_EXTERN_PTR;
+        case HLIL_FLOAT_CONST: return kHLILOperandSpecs_HLIL_FLOAT_CONST;
+        case HLIL_IMPORT: return kHLILOperandSpecs_HLIL_IMPORT;
+        case HLIL_ADD: return kHLILOperandSpecs_HLIL_ADD;
+        case HLIL_ADC: return kHLILOperandSpecs_HLIL_ADC;
+        case HLIL_SUB: return kHLILOperandSpecs_HLIL_SUB;
+        case HLIL_SBB: return kHLILOperandSpecs_HLIL_SBB;
+        case HLIL_AND: return kHLILOperandSpecs_HLIL_AND;
+        case HLIL_OR: return kHLILOperandSpecs_HLIL_OR;
+        case HLIL_XOR: return kHLILOperandSpecs_HLIL_XOR;
+        case HLIL_LSL: return kHLILOperandSpecs_HLIL_LSL;
+        case HLIL_LSR: return kHLILOperandSpecs_HLIL_LSR;
+        case HLIL_ASR: return kHLILOperandSpecs_HLIL_ASR;
+        case HLIL_ROL: return kHLILOperandSpecs_HLIL_ROL;
+        case HLIL_RLC: return kHLILOperandSpecs_HLIL_RLC;
+        case HLIL_ROR: return kHLILOperandSpecs_HLIL_ROR;
+        case HLIL_RRC: return kHLILOperandSpecs_HLIL_RRC;
+        case HLIL_MUL: return kHLILOperandSpecs_HLIL_MUL;
+        case HLIL_MULU_DP: return kHLILOperandSpecs_HLIL_MULU_DP;
+        case HLIL_MULS_DP: return kHLILOperandSpecs_HLIL_MULS_DP;
+        case HLIL_DIVU: return kHLILOperandSpecs_HLIL_DIVU;
+        case HLIL_DIVU_DP: return kHLILOperandSpecs_HLIL_DIVU_DP;
+        case HLIL_DIVS: return kHLILOperandSpecs_HLIL_DIVS;
+        case HLIL_DIVS_DP: return kHLILOperandSpecs_HLIL_DIVS_DP;
+        case HLIL_MODU: return kHLILOperandSpecs_HLIL_MODU;
+        case HLIL_MODU_DP: return kHLILOperandSpecs_HLIL_MODU_DP;
+        case HLIL_MODS: return kHLILOperandSpecs_HLIL_MODS;
+        case HLIL_MODS_DP: return kHLILOperandSpecs_HLIL_MODS_DP;
+        case HLIL_NEG: return kHLILOperandSpecs_HLIL_NEG;
+        case HLIL_NOT: return kHLILOperandSpecs_HLIL_NOT;
+        case HLIL_SX: return kHLILOperandSpecs_HLIL_SX;
+        case HLIL_ZX: return kHLILOperandSpecs_HLIL_ZX;
+        case HLIL_LOW_PART: return kHLILOperandSpecs_HLIL_LOW_PART;
+        case HLIL_CALL: return kHLILOperandSpecs_HLIL_CALL;
+        case HLIL_CMP_E: return kHLILOperandSpecs_HLIL_CMP_E;
+        case HLIL_CMP_NE: return kHLILOperandSpecs_HLIL_CMP_NE;
+        case HLIL_CMP_SLT: return kHLILOperandSpecs_HLIL_CMP_SLT;
+        case HLIL_CMP_ULT: return kHLILOperandSpecs_HLIL_CMP_ULT;
+        case HLIL_CMP_SLE: return kHLILOperandSpecs_HLIL_CMP_SLE;
+        case HLIL_CMP_ULE: return kHLILOperandSpecs_HLIL_CMP_ULE;
+        case HLIL_CMP_SGE: return kHLILOperandSpecs_HLIL_CMP_SGE;
+        case HLIL_CMP_UGE: return kHLILOperandSpecs_HLIL_CMP_UGE;
+        case HLIL_CMP_SGT: return kHLILOperandSpecs_HLIL_CMP_SGT;
+        case HLIL_CMP_UGT: return kHLILOperandSpecs_HLIL_CMP_UGT;
+        case HLIL_TEST_BIT: return kHLILOperandSpecs_HLIL_TEST_BIT;
+        case HLIL_BOOL_TO_INT: return kHLILOperandSpecs_HLIL_BOOL_TO_INT;
+        case HLIL_ADD_OVERFLOW: return kHLILOperandSpecs_HLIL_ADD_OVERFLOW;
+        case HLIL_SYSCALL: return kHLILOperandSpecs_HLIL_SYSCALL;
+        case HLIL_TAILCALL: return kHLILOperandSpecs_HLIL_TAILCALL;
+        case HLIL_INTRINSIC: return kHLILOperandSpecs_HLIL_INTRINSIC;
+        case HLIL_TRAP: return kHLILOperandSpecs_HLIL_TRAP;
+        case HLIL_UNIMPL_MEM: return kHLILOperandSpecs_HLIL_UNIMPL_MEM;
+        case HLIL_FADD: return kHLILOperandSpecs_HLIL_FADD;
+        case HLIL_FSUB: return kHLILOperandSpecs_HLIL_FSUB;
+        case HLIL_FMUL: return kHLILOperandSpecs_HLIL_FMUL;
+        case HLIL_FDIV: return kHLILOperandSpecs_HLIL_FDIV;
+        case HLIL_FSQRT: return kHLILOperandSpecs_HLIL_FSQRT;
+        case HLIL_FNEG: return kHLILOperandSpecs_HLIL_FNEG;
+        case HLIL_FABS: return kHLILOperandSpecs_HLIL_FABS;
+        case HLIL_FLOAT_TO_INT: return kHLILOperandSpecs_HLIL_FLOAT_TO_INT;
+        case HLIL_INT_TO_FLOAT: return kHLILOperandSpecs_HLIL_INT_TO_FLOAT;
+        case HLIL_FLOAT_CONV: return kHLILOperandSpecs_HLIL_FLOAT_CONV;
+        case HLIL_ROUND_TO_INT: return kHLILOperandSpecs_HLIL_ROUND_TO_INT;
+        case HLIL_FLOOR: return kHLILOperandSpecs_HLIL_FLOOR;
+        case HLIL_CEIL: return kHLILOperandSpecs_HLIL_CEIL;
+        case HLIL_FTRUNC: return kHLILOperandSpecs_HLIL_FTRUNC;
+        case HLIL_FCMP_E: return kHLILOperandSpecs_HLIL_FCMP_E;
+        case HLIL_FCMP_NE: return kHLILOperandSpecs_HLIL_FCMP_NE;
+        case HLIL_FCMP_LT: return kHLILOperandSpecs_HLIL_FCMP_LT;
+        case HLIL_FCMP_LE: return kHLILOperandSpecs_HLIL_FCMP_LE;
+        case HLIL_FCMP_GE: return kHLILOperandSpecs_HLIL_FCMP_GE;
+        case HLIL_FCMP_GT: return kHLILOperandSpecs_HLIL_FCMP_GT;
+        case HLIL_FCMP_O: return kHLILOperandSpecs_HLIL_FCMP_O;
+        case HLIL_FCMP_UO: return kHLILOperandSpecs_HLIL_FCMP_UO;
+        case HLIL_WHILE_SSA: return kHLILOperandSpecs_HLIL_WHILE_SSA;
+        case HLIL_DO_WHILE_SSA: return kHLILOperandSpecs_HLIL_DO_WHILE_SSA;
+        case HLIL_FOR_SSA: return kHLILOperandSpecs_HLIL_FOR_SSA;
+        case HLIL_VAR_INIT_SSA: return kHLILOperandSpecs_HLIL_VAR_INIT_SSA;
+        case HLIL_ASSIGN_MEM_SSA: return kHLILOperandSpecs_HLIL_ASSIGN_MEM_SSA;
+        case HLIL_ASSIGN_UNPACK_MEM_SSA: return kHLILOperandSpecs_HLIL_ASSIGN_UNPACK_MEM_SSA;
+        case HLIL_VAR_SSA: return kHLILOperandSpecs_HLIL_VAR_SSA;
+        case HLIL_ARRAY_INDEX_SSA: return kHLILOperandSpecs_HLIL_ARRAY_INDEX_SSA;
+        case HLIL_DEREF_SSA: return kHLILOperandSpecs_HLIL_DEREF_SSA;
+        case HLIL_DEREF_FIELD_SSA: return kHLILOperandSpecs_HLIL_DEREF_FIELD_SSA;
+        case HLIL_CALL_SSA: return kHLILOperandSpecs_HLIL_CALL_SSA;
+        case HLIL_SYSCALL_SSA: return kHLILOperandSpecs_HLIL_SYSCALL_SSA;
+        case HLIL_INTRINSIC_SSA: return kHLILOperandSpecs_HLIL_INTRINSIC_SSA;
+        case HLIL_VAR_PHI: return kHLILOperandSpecs_HLIL_VAR_PHI;
+        case HLIL_MEM_PHI: return kHLILOperandSpecs_HLIL_MEM_PHI;
+        default: return kHLILOperandSpecsEmpty;
+    }
+}

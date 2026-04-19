@@ -3,19 +3,22 @@
 // R9.1 commit 2a: LLILOperandSpec struct + per-opcode dispatch
 // declaration. R9.1 commit 2b: projection helpers + traverse worker.
 // R9.2 commit B: MLILOperandSpec + MLIL projection + MLILInstruction
-// usertype registration. HLIL sibling (R9.3) will add the analogous
-// HLIL declarations.
+// usertype registration. R9.3 commit B: HLILOperandSpec + HLIL
+// projection + HLILInstruction usertype registration + tree-nav
+// helpers.
 
 #pragma once
 
 #include "common.h"
 
 // Full definitions of LowLevelILInstruction / MediumLevelILInstruction
-// and the *List container classes. binaryninjaapi.h only forward-
-// declares them, so we need the full headers to call GetRawOperandAs*
-// methods and to iterate the list containers.
+// / HighLevelILInstruction and the *List container classes.
+// binaryninjaapi.h only forward-declares them, so we need the full
+// headers to call GetRawOperandAs* methods and to iterate the list
+// containers.
 #include "lowlevelilinstruction.h"
 #include "mediumlevelilinstruction.h"
+#include "highlevelilinstruction.h"
 
 #include <cstdint>
 #include <vector>
@@ -55,6 +58,19 @@ struct LLILOperandSpec {
 // reg_ssa, flag_ssa, reg_stack_ssa, reg_*_list) since MLIL operates
 // on typed variables rather than raw registers.
 struct MLILOperandSpec {
+    const char* name;
+    const char* type_tag;
+    uint8_t slot_first;
+    uint8_t slot_last;
+};
+
+// Per-operand spec for HLIL. Field-identical to LLILOperandSpec and
+// MLILOperandSpec; see docs/il-metatable-design.md section 13.3 for
+// the HLIL type_tag vocabulary (shared core tags plus HLIL-unique
+// "label" and "member_index"). Kept distinct from the LLIL/MLIL
+// structs so the dispatcher and generator stay compile-time separate
+// per family.
+struct HLILOperandSpec {
     const char* name;
     const char* type_tag;
     uint8_t slot_first;
@@ -176,5 +192,61 @@ sol::table BuildMLILPrefixOperandsTable(
 sol::table TraverseMLILInstruction(sol::this_state ts,
                                     const MediumLevelILInstruction& instr,
                                     sol::function cb);
+
+// ---- HLIL analogs (R9.3 commit B) ----
+
+// Per-opcode dispatch for HLIL. Returns a reference to a static empty
+// vector when the opcode has no detailed_operands override in Python
+// (HLIL_NOP, HLIL_BREAK, HLIL_CONTINUE, HLIL_NORET, HLIL_UNREACHABLE,
+// HLIL_BP, HLIL_UNDEF, HLIL_UNIMPL, plus any opcodes whose subclass
+// is not concretely defined). Generated in
+// bindings/il_operands_table.inc alongside the LLIL + MLIL
+// dispatchers.
+const std::vector<HLILOperandSpec>& HLILOperandSpecsForOperation(
+    BNHighLevelILOperation op);
+
+// Resolve the owning Architecture for a HighLevelILInstruction, or
+// nullptr when the IL function has no attached BN Function.
+Ref<Architecture> ArchFor(const HighLevelILInstruction& instr);
+
+// Project a single HLIL operand spec to a Lua value. Tag vocabulary
+// documented at docs/il-metatable-design.md section 13.3: "int",
+// "float", "expr", "expr_list", "int_list", "var", "var_ssa",
+// "var_list", "var_ssa_list", "intrinsic", "ConstantData" (shared
+// with MLIL plus MLIL-shared shapes) + HLIL-unique "label"
+// ({label_id, name}) and "member_index" (int64 or nil if the
+// high-bit sentinel is set). No "target_map" / "cond" / register-
+// level tags. Unknown tags return sol::nil.
+sol::object HLILOperandToLua(sol::state_view lua,
+                              const HighLevelILInstruction& instr,
+                              const HLILOperandSpec& spec);
+
+// Build the 1-indexed `instr.operands` list for an HLIL instruction.
+sol::table BuildHLILOperandsTable(sol::this_state ts,
+                                   const HighLevelILInstruction& instr);
+
+// Build the 1-indexed `instr.detailed_operands` list for an HLIL
+// instruction. Each entry is {name=..., value=..., type=...}.
+sol::table BuildHLILDetailedOperandsTable(
+    sol::this_state ts, const HighLevelILInstruction& instr);
+
+// Prefix-order flattened walk of the HLIL expression tree.
+sol::table BuildHLILPrefixOperandsTable(
+    sol::this_state ts, const HighLevelILInstruction& instr);
+
+// Depth-first pre-order walk for HLIL.
+sol::table TraverseHLILInstruction(sol::this_state ts,
+                                    const HighLevelILInstruction& instr,
+                                    sol::function cb);
+
+// Tree navigation - HLIL-unique surface (see section 13.4). children
+// is the flattened union of operand slots tagged "expr" or
+// "expr_list" in the generator output, preserving operand order.
+// ancestors repeatedly dereferences GetParent() until HasParent()
+// returns false.
+sol::table GetHLILChildren(sol::this_state ts,
+                            const HighLevelILInstruction& instr);
+sol::table GetHLILAncestors(sol::this_state ts,
+                             const HighLevelILInstruction& instr);
 
 }  // namespace BinjaLua

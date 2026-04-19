@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BN_HEADER = REPO_ROOT / "binaryninja-api" / "binaryninjacore.h"
 PY_LLIL = REPO_ROOT / "binaryninja-api" / "python" / "lowlevelil.py"
 PY_MLIL = REPO_ROOT / "binaryninja-api" / "python" / "mediumlevelil.py"
+PY_HLIL = REPO_ROOT / "binaryninja-api" / "python" / "highlevelil.py"
 ENUMS_OUT = REPO_ROOT / "bindings" / "il_enums.inc"
 OPERANDS_OUT = REPO_ROOT / "bindings" / "il_operands_table.inc"
 
@@ -93,6 +94,12 @@ ACCESSOR_TO_TAG: Dict[str, Tuple[str, int]] = {
     # section 12.3 gotcha); py-researcher-2 flagged this during the
     # R9.2 spec review.
     "_get_constant_data":          ("ConstantData",           2),
+    # HLIL-specific accessors (R9.3 per docs section 13.3).
+    # _get_label returns a GotoLabel struct; Lua projection emits
+    # {label_id, name}. _get_member_index returns Optional[int];
+    # high-bit sentinel maps to nil on the Lua side.
+    "_get_label":                  ("label",                  1),
+    "_get_member_index":           ("member_index",           1),
 }
 
 
@@ -254,14 +261,16 @@ class DetailedOperandsExtractor:
     _CLS_PREFIX = {
         "LLIL": "LowLevelIL",
         "MLIL": "MediumLevelIL",
+        "HLIL": "HighLevelIL",
     }
     _OP_PREFIX = {
         "LLIL": "LLIL_",
         "MLIL": "MLIL_",
+        "HLIL": "HLIL_",
     }
 
     def __init__(self, source: str, family: str) -> None:
-        assert family in ("LLIL", "MLIL"), family
+        assert family in ("LLIL", "MLIL", "HLIL"), family
         self.family = family
         self.cls_prefix = self._CLS_PREFIX[family]
         self.op_prefix = self._OP_PREFIX[family]
@@ -284,7 +293,8 @@ class DetailedOperandsExtractor:
                 self._scan_class(node)
         # Locate the module-level `ILInstruction` dispatch dict. LLIL
         # lives at python/lowlevelil.py:3085; MLIL at
-        # python/mediumlevelil.py:3101.
+        # python/mediumlevelil.py:3101; HLIL at
+        # python/highlevelil.py:2381.
         for node in self.tree.body:
             if isinstance(node, ast.AnnAssign):
                 target = node.target
@@ -597,19 +607,20 @@ def emit_enums() -> Tuple[int, int]:
 
 
 def emit_operands() -> int:
-    if not PY_LLIL.exists():
-        print(f"error: missing {PY_LLIL}", file=sys.stderr)
-        return -1
-    if not PY_MLIL.exists():
-        print(f"error: missing {PY_MLIL}", file=sys.stderr)
-        return -1
+    for p in (PY_LLIL, PY_MLIL, PY_HLIL):
+        if not p.exists():
+            print(f"error: missing {p}", file=sys.stderr)
+            return -1
     llil_source = PY_LLIL.read_text(encoding="utf-8")
     llil_extractor = DetailedOperandsExtractor(llil_source, "LLIL")
     mlil_source = PY_MLIL.read_text(encoding="utf-8")
     mlil_extractor = DetailedOperandsExtractor(mlil_source, "MLIL")
+    hlil_source = PY_HLIL.read_text(encoding="utf-8")
+    hlil_extractor = DetailedOperandsExtractor(hlil_source, "HLIL")
 
     llil_ops = extract_enumerators(BN_HEADER, *LLIL_OP_LINES, "LLIL_")
     mlil_ops = extract_enumerators(BN_HEADER, *MLIL_OP_LINES, "MLIL_")
+    hlil_ops = extract_enumerators(BN_HEADER, *HLIL_OP_LINES, "HLIL_")
 
     parts: List[str] = [OPERANDS_HEADER, "\n"]
     parts.append("// ---- BNLowLevelILOperation operand specs ----\n\n")
@@ -619,6 +630,10 @@ def emit_operands() -> int:
     parts.append("// ---- BNMediumLevelILOperation operand specs ----\n\n")
     parts.append(emit_operands_table(
         mlil_ops, mlil_extractor, "MLIL", "BNMediumLevelILOperation"))
+    parts.append("\n")
+    parts.append("// ---- BNHighLevelILOperation operand specs ----\n\n")
+    parts.append(emit_operands_table(
+        hlil_ops, hlil_extractor, "HLIL", "BNHighLevelILOperation"))
 
     output = "".join(parts)
     OPERANDS_OUT.write_text(output, encoding="utf-8", newline="\n")
@@ -627,6 +642,8 @@ def emit_operands() -> int:
         1 for op in llil_ops if llil_extractor.specs_for_op(op))
     mlil_covered = sum(
         1 for op in mlil_ops if mlil_extractor.specs_for_op(op))
+    hlil_covered = sum(
+        1 for op in hlil_ops if hlil_extractor.specs_for_op(op))
     unresolved: List[Tuple[str, str, str]] = []
     for op in llil_ops:
         for name, tag, _, _ in llil_extractor.specs_for_op(op):
@@ -636,9 +653,14 @@ def emit_operands() -> int:
         for name, tag, _, _ in mlil_extractor.specs_for_op(op):
             if tag == "unknown":
                 unresolved.append(("MLIL", op, name))
+    for op in hlil_ops:
+        for name, tag, _, _ in hlil_extractor.specs_for_op(op):
+            if tag == "unknown":
+                unresolved.append(("HLIL", op, name))
     print(f"wrote {OPERANDS_OUT} ({len(output)} bytes, "
           f"LLIL {llil_covered}/{len(llil_ops)} + "
-          f"MLIL {mlil_covered}/{len(mlil_ops)} opcodes with non-empty "
+          f"MLIL {mlil_covered}/{len(mlil_ops)} + "
+          f"HLIL {hlil_covered}/{len(hlil_ops)} opcodes with non-empty "
           f"specs, {len(unresolved)} unresolved field(s))")
     if unresolved:
         print("unresolved fields (emitted with tag=\"unknown\"):",
