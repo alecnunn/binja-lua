@@ -13,6 +13,30 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
+- _nothing yet_
+
+### Changed
+
+- _nothing yet_
+
+### Fixed
+
+- _nothing yet_
+
+### Removed
+
+- _nothing yet_
+
+## [0.3.1] - unreleased
+
+PATCH release under the semver policy in `docs/versioning.md` — the
+wave is strictly additive relative to v0.3.0 with no breaking changes
+to any previously shipped Lua-visible surface. Ships the R9.2 MLIL and
+R9.3 HLIL operand-walking waves, completing the R9 Approach-D
+instruction-usertype family started in v0.3.0's R9.1 LLIL binding.
+
+### Added
+
 - **R9.3: `HLILInstruction` value-usertype + HLIL operand walking
   + tree navigation** (extends `bindings/il_operand_conv.cpp`,
   `bindings/il.h`, `bindings/il_operands_table.inc`, and
@@ -505,7 +529,8 @@ base to compare against.
 
 - Initial public release.
 
-[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alecnunn/binja-lua/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/alecnunn/binja-lua/compare/v0.1.0...v0.1.1
