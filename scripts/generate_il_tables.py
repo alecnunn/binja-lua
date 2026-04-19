@@ -33,17 +33,32 @@ from typing import Dict, Iterable, List, Optional, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BN_HEADER = REPO_ROOT / "binaryninja-api" / "binaryninjacore.h"
 PY_LLIL = REPO_ROOT / "binaryninja-api" / "python" / "lowlevelil.py"
+PY_MLIL = REPO_ROOT / "binaryninja-api" / "python" / "mediumlevelil.py"
+PY_HLIL = REPO_ROOT / "binaryninja-api" / "python" / "highlevelil.py"
 ENUMS_OUT = REPO_ROOT / "bindings" / "il_enums.inc"
 OPERANDS_OUT = REPO_ROOT / "bindings" / "il_operands_table.inc"
 
 LLIL_OP_LINES = (586, 737)
 LLFC_LINES = (739, 765)
+# BNMediumLevelILOperation block verified by grep on
+# binaryninjacore.h:1338-1488 (140 enumerators). Added for R9.2.
+MLIL_OP_LINES = (1338, 1488)
+# BNHighLevelILOperation block verified by grep on
+# binaryninjacore.h:1521-1658 (126 enumerators). Added for R9.3.
+HLIL_OP_LINES = (1521, 1658)
 
 # Map Python _get_X accessor name -> (type_tag, arg_count). arg_count
 # tells us how many slot indexes to consume: 1 for single-slot and
 # single-slot-internally-paired list accessors (BN helper consumes the
 # (size, operand_idx) pair internally via a single slot argument);
-# 2 for explicit-pair SSA accessors.
+# 2 for explicit-pair SSA accessors. Shared between LLIL and MLIL.
+# The MLIL-specific accessors (_get_var, _get_var_ssa, _get_var_list,
+# _get_var_ssa_list, _get_var_ssa_dest_and_src, _get_constant_data)
+# were added for R9.2 per docs/il-metatable-design.md section 12.3.
+# _get_var_list and _get_expr_list on MediumLevelILInstruction accept
+# TWO positional ints in Python but the second is ignored inside the
+# body (see python/mediumlevelil.py:1092-1097); expose them with
+# arity 1 so the reflection pass only walks slot_first.
 ACCESSOR_TO_TAG: Dict[str, Tuple[str, int]] = {
     "_get_reg":                    ("reg",                    1),
     "_get_flag":                   ("flag",                   1),
@@ -68,6 +83,23 @@ ACCESSOR_TO_TAG: Dict[str, Tuple[str, int]] = {
     "_get_flag_ssa":               ("flag_ssa",               2),
     "_get_reg_ssa":                ("reg_ssa",                2),
     "_get_reg_stack_ssa":          ("reg_stack_ssa",          2),
+    # MLIL-specific accessors.
+    "_get_var":                    ("var",                    1),
+    "_get_var_ssa":                ("var_ssa",                2),
+    "_get_var_list":               ("var_list",               1),
+    "_get_var_ssa_list":           ("var_ssa_list",           1),
+    "_get_var_ssa_dest_and_src":   ("var_ssa_dest_and_src",   2),
+    # ConstantData tag is CamelCase per Python's ConstantDataType rather
+    # than the snake_case used by every other MLIL tag (see docs
+    # section 12.3 gotcha); py-researcher-2 flagged this during the
+    # R9.2 spec review.
+    "_get_constant_data":          ("ConstantData",           2),
+    # HLIL-specific accessors (R9.3 per docs section 13.3).
+    # _get_label returns a GotoLabel struct; Lua projection emits
+    # {label_id, name}. _get_member_index returns Optional[int];
+    # high-bit sentinel maps to nil on the Lua side.
+    "_get_label":                  ("label",                  1),
+    "_get_member_index":           ("member_index",           1),
 }
 
 
@@ -131,24 +163,40 @@ def emit_enum_from_string(enum_type: str, values: Iterable[str],
 
 ENUMS_HEADER = """\
 // Auto-generated from binaryninja-api/binaryninjacore.h.
-// Generator: scripts/generate_il_tables.py (local-only, NOT committed).
+// Generator: scripts/generate_il_tables.py (tracked, run by hand).
 // Do NOT hand-edit. Regenerate after bumping the BN submodule.
 //
-// Contents (commit 1 scope, R9.1 enums-only):
+// Contents:
 //   - EnumToString / EnumFromString for BNLowLevelILOperation
 //     (143 enumerators from binaryninjacore.h:586-737).
 //   - EnumToString / EnumFromString for BNLowLevelILFlagCondition
 //     (22 enumerators from binaryninjacore.h:739-763: 14 integer +
 //     8 floating-point).
+//   - EnumToString / EnumFromString for BNMediumLevelILOperation
+//     (140 enumerators from binaryninjacore.h:1338-1488). Added in
+//     R9.2 commit A.
+//   - EnumToString / EnumFromString for BNHighLevelILOperation
+//     (126 enumerators from binaryninjacore.h:1521-1658). Added in
+//     R9.3 commit A.
 //
 // Short-form vocabulary: mechanical prefix-strip + lowercase. So
 // LLIL_SET_REG -> \"set_reg\", LLIL_CMP_SLT -> \"cmp_slt\",
-// LLFC_E -> \"e\", LLFC_FUO -> \"fuo\". See
-// docs/il-metatable-design.md section 4.2 / 4.2a for the ratification.
+// LLFC_E -> \"e\", LLFC_FUO -> \"fuo\", MLIL_SET_VAR -> \"set_var\",
+// MLIL_CALL_SSA -> \"call_ssa\", HLIL_ASSIGN -> \"assign\",
+// HLIL_VAR_DECLARE -> \"var_declare\". See
+// docs/il-metatable-design.md section 4.2 / 4.2a for LLIL, section
+// 12.2 for MLIL, and section 13.2 for HLIL.
 //
 // Dual-accept: EnumFromString accepts BOTH the short canonical form
 // AND the verbatim BN/Python enumerator name (e.g. \"set_reg\" or
-// \"LLIL_SET_REG\"). Case-sensitive match.
+// \"LLIL_SET_REG\", \"set_var\" or \"MLIL_SET_VAR\", \"assign\" or
+// \"HLIL_ASSIGN\"). Case-sensitive match.
+//
+// HLIL gotcha: a handful of HLIL opcodes short-form into Lua
+// reserved words (\"if\", \"while\", \"for\", \"do\", \"return\",
+// \"break\", \"goto\", \"continue\"). These are safe as STRING
+// values; they only collide with identifiers if written as raw
+// names, which this vocabulary never does.
 //
 // This file is included by bindings/il_operand_conv.cpp inside the
 // BinjaLua namespace. It is a .inc fragment, not a standalone
@@ -157,34 +205,38 @@ ENUMS_HEADER = """\
 
 
 OPERANDS_HEADER = """\
-// Auto-generated from binaryninja-api/python/lowlevelil.py.
-// Generator: scripts/generate_il_tables.py (local-only, NOT committed).
+// Auto-generated from binaryninja-api/python/lowlevelil.py and
+// binaryninja-api/python/mediumlevelil.py.
+// Generator: scripts/generate_il_tables.py (tracked, run by hand).
 // Do NOT hand-edit. Regenerate after bumping the BN submodule.
 //
-// Contents (commit 2a scope, R9.1 operand-spec table):
+// Contents:
 //   - LLILOperandSpecsForOperation(BNLowLevelILOperation) returning
 //     the per-opcode const vector<LLILOperandSpec>& used by
 //     LLILOperandToLua to project raw instruction operands into Lua
-//     values.
+//     values. Originally landed in R9.1 commit 2a.
+//   - MLILOperandSpecsForOperation(BNMediumLevelILOperation) returning
+//     the per-opcode const vector<MLILOperandSpec>& used by
+//     MLILOperandToLua. Added in R9.2 commit B.
 //
-// LLILOperandSpec shape (struct defined in bindings/il.h):
-//     struct LLILOperandSpec {
-//         const char* name;
-//         const char* type_tag;
-//         uint8_t slot_first;
-//         uint8_t slot_last;
-//     };
+// *OperandSpec shape (structs defined in bindings/il.h, field-identical
+// between the two families):
+//     struct LLILOperandSpec { const char* name; const char* type_tag;
+//                              uint8_t slot_first; uint8_t slot_last; };
+//     struct MLILOperandSpec { same; };
 //
 // For single-slot scalars and single-slot list/map accessors, slot_last
-// == slot_first. For explicit-pair SSA tags (reg_ssa, flag_ssa,
-// reg_stack_ssa), slot_last == slot_first + 1. Both encodings match
-// python/lowlevelil.py per-subclass detailed_operands overrides (see
-// scripts/generate_il_tables.py ACCESSOR_TO_TAG mapping).
+// == slot_first. For explicit-pair accessors (reg_ssa, flag_ssa,
+// reg_stack_ssa, var_ssa, var_ssa_dest_and_src, ConstantData),
+// slot_last == slot_first + 1. Encodings match the Python
+// per-subclass detailed_operands overrides; see
+// scripts/generate_il_tables.py ACCESSOR_TO_TAG mapping.
 //
-// Opcodes with empty detailed_operands (LLIL_NOP, LLIL_NORET,
-// LLIL_POP, LLIL_SYSCALL, LLIL_BP, LLIL_UNDEF, LLIL_UNIMPL, plus
-// opcodes whose Python subclass is not concretely defined) map to an
-// empty spec vector via the switch's default arm.
+// Opcodes with empty detailed_operands (LLIL_NOP, LLIL_NORET, LLIL_POP,
+// LLIL_SYSCALL, LLIL_BP, LLIL_UNDEF, LLIL_UNIMPL, MLIL_NOP,
+// MLIL_NORET, MLIL_BP, MLIL_UNDEF, MLIL_UNIMPL, plus opcodes whose
+// Python subclass is not concretely defined) map to an empty spec
+// vector via each switch's default arm.
 //
 // This file is included by bindings/il_operand_conv.cpp inside the
 // BinjaLua namespace.
@@ -192,12 +244,36 @@ OPERANDS_HEADER = """\
 
 
 class DetailedOperandsExtractor:
-    """Parse python/lowlevelil.py, find every LowLevelIL subclass, and
-    for each subclass determine the ordered list of
-    (operand_name, type_tag, slot_first, slot_last) triples produced by
-    its detailed_operands property."""
+    """Parse a python/<family>il.py file, find every per-opcode IL
+    subclass, and for each subclass determine the ordered list of
+    (operand_name, type_tag, slot_first, slot_last) triples produced
+    by its detailed_operands property.
 
-    def __init__(self, source: str) -> None:
+    family: one of "LLIL" or "MLIL". Selects the class-name prefix
+    (LowLevelIL / MediumLevelIL), the operation-enum prefix
+    (LLIL_ / MLIL_), and the detailed_operands tuple shape:
+        - LLIL returns 2-tuples ``(name_str, self.field)``.
+        - MLIL returns 3-tuples ``(name_str, self.field, type_str)``;
+          the type_str is informational and discarded here since the
+          tag comes from tracing self.field's accessor body.
+    """
+
+    _CLS_PREFIX = {
+        "LLIL": "LowLevelIL",
+        "MLIL": "MediumLevelIL",
+        "HLIL": "HighLevelIL",
+    }
+    _OP_PREFIX = {
+        "LLIL": "LLIL_",
+        "MLIL": "MLIL_",
+        "HLIL": "HLIL_",
+    }
+
+    def __init__(self, source: str, family: str) -> None:
+        assert family in ("LLIL", "MLIL", "HLIL"), family
+        self.family = family
+        self.cls_prefix = self._CLS_PREFIX[family]
+        self.op_prefix = self._OP_PREFIX[family]
         self.tree = ast.parse(source)
         # class_name -> { property_name -> (tag, slot_first, slot_last) }
         self.cls_prop_slots: Dict[
@@ -213,10 +289,12 @@ class DetailedOperandsExtractor:
     def _walk(self) -> None:
         for node in self.tree.body:
             if isinstance(node, ast.ClassDef) and \
-                    node.name.startswith("LowLevelIL"):
+                    node.name.startswith(self.cls_prefix):
                 self._scan_class(node)
-        # Locate the module-level `ILInstruction` dispatch dict at
-        # python/lowlevelil.py:3085.
+        # Locate the module-level `ILInstruction` dispatch dict. LLIL
+        # lives at python/lowlevelil.py:3085; MLIL at
+        # python/mediumlevelil.py:3101; HLIL at
+        # python/highlevelil.py:2381.
         for node in self.tree.body:
             if isinstance(node, ast.AnnAssign):
                 target = node.target
@@ -304,6 +382,11 @@ class DetailedOperandsExtractor:
     def _parse_detailed_operands(
             self, fn: ast.FunctionDef
     ) -> Optional[List[Tuple[str, str]]]:
+        # LLIL emits 2-tuples (name_str, self.field); MLIL emits
+        # 3-tuples (name_str, self.field, type_str). Both forms put
+        # the bound field at index 1; the MLIL type string is
+        # informational and discarded here because the concrete tag
+        # is resolved by walking self.field's accessor body.
         for stmt in fn.body:
             if not isinstance(stmt, ast.Return):
                 continue
@@ -342,15 +425,15 @@ class DetailedOperandsExtractor:
             if op_name and cls_name:
                 self.op_to_cls[op_name] = cls_name
 
-    @staticmethod
-    def _extract_op_name(node: Optional[ast.expr]) -> Optional[str]:
-        if isinstance(node, ast.Attribute) and node.attr.startswith("LLIL_"):
+    def _extract_op_name(self, node: Optional[ast.expr]) -> Optional[str]:
+        if isinstance(node, ast.Attribute) and \
+                node.attr.startswith(self.op_prefix):
             return node.attr
         return None
 
-    @staticmethod
-    def _extract_cls_name(node: Optional[ast.expr]) -> Optional[str]:
-        if isinstance(node, ast.Name) and node.id.startswith("LowLevelIL"):
+    def _extract_cls_name(self, node: Optional[ast.expr]) -> Optional[str]:
+        if isinstance(node, ast.Name) and \
+                node.id.startswith(self.cls_prefix):
             return node.id
         return None
 
@@ -410,10 +493,24 @@ class DetailedOperandsExtractor:
 
 
 def emit_operands_table(operations: List[str],
-                         extractor: DetailedOperandsExtractor) -> str:
+                         extractor: DetailedOperandsExtractor,
+                         family: str,
+                         enum_type: str) -> str:
+    """Emit the operand-spec fragment for a given IL family.
+
+    family is the short prefix used in generated C++ identifiers
+    ("LLIL" / "MLIL"). enum_type is the BN operation enum type
+    ("BNLowLevelILOperation" / "BNMediumLevelILOperation").
+
+    Uses the family's *OperandSpec struct. Per the R9.2 spec section
+    12.5, MLIL reuses the same {name, type_tag, slot_first, slot_last}
+    shape as LLIL via a typedef alias declared in bindings/il.h, so
+    the C++ struct name differs per family while the fields are
+    identical.
+    """
     lines: List[str] = []
-    lines.append("static const std::vector<LLILOperandSpec> "
-                 "kLLILOperandSpecsEmpty{};")
+    lines.append(f"static const std::vector<{family}OperandSpec> "
+                 f"k{family}OperandSpecsEmpty{{}};")
     lines.append("")
 
     non_empty: List[Tuple[str, List[Tuple[str, str, int, int]]]] = []
@@ -424,8 +521,8 @@ def emit_operands_table(operations: List[str],
 
     for op, specs in non_empty:
         lines.append(
-            f"static const std::vector<LLILOperandSpec> "
-            f"kLLILOperandSpecs_{op}{{"
+            f"static const std::vector<{family}OperandSpec> "
+            f"k{family}OperandSpecs_{op}{{"
         )
         for name, tag, sf, sl in specs:
             lines.append(
@@ -436,12 +533,13 @@ def emit_operands_table(operations: List[str],
         lines.append("};")
         lines.append("")
 
-    lines.append("const std::vector<LLILOperandSpec>& "
-                 "LLILOperandSpecsForOperation(BNLowLevelILOperation op) {")
+    lines.append(f"const std::vector<{family}OperandSpec>& "
+                 f"{family}OperandSpecsForOperation({enum_type} op) {{")
     lines.append("    switch (op) {")
     for op, _ in non_empty:
-        lines.append(f"        case {op}: return kLLILOperandSpecs_{op};")
-    lines.append("        default: return kLLILOperandSpecsEmpty;")
+        lines.append(
+            f"        case {op}: return k{family}OperandSpecs_{op};")
+    lines.append(f"        default: return k{family}OperandSpecsEmpty;")
     lines.append("    }")
     lines.append("}")
     return "\n".join(lines) + "\n"
@@ -453,12 +551,22 @@ def emit_enums() -> Tuple[int, int]:
         return -1, -1
     llil_ops = extract_enumerators(BN_HEADER, *LLIL_OP_LINES, "LLIL_")
     llfc = extract_enumerators(BN_HEADER, *LLFC_LINES, "LLFC_")
+    mlil_ops = extract_enumerators(BN_HEADER, *MLIL_OP_LINES, "MLIL_")
+    hlil_ops = extract_enumerators(BN_HEADER, *HLIL_OP_LINES, "HLIL_")
     if len(llil_ops) != 143:
         print(f"error: expected 143 LLIL opcodes, got {len(llil_ops)}",
               file=sys.stderr)
         return -1, -1
     if len(llfc) != 22:
         print(f"error: expected 22 LLFC conditions, got {len(llfc)}",
+              file=sys.stderr)
+        return -1, -1
+    if len(mlil_ops) != 140:
+        print(f"error: expected 140 MLIL opcodes, got {len(mlil_ops)}",
+              file=sys.stderr)
+        return -1, -1
+    if len(hlil_ops) != 126:
+        print(f"error: expected 126 HLIL opcodes, got {len(hlil_ops)}",
               file=sys.stderr)
         return -1, -1
 
@@ -476,41 +584,89 @@ def emit_enums() -> Tuple[int, int]:
     parts.append("\n")
     parts.append(emit_enum_from_string("BNLowLevelILFlagCondition",
                                        llfc, "LLFC_"))
+    parts.append("\n")
+    parts.append("// ---- BNMediumLevelILOperation ----\n\n")
+    parts.append(emit_enum_to_string("BNMediumLevelILOperation",
+                                     mlil_ops, "MLIL_"))
+    parts.append("\n")
+    parts.append(emit_enum_from_string("BNMediumLevelILOperation",
+                                       mlil_ops, "MLIL_"))
+    parts.append("\n")
+    parts.append("// ---- BNHighLevelILOperation ----\n\n")
+    parts.append(emit_enum_to_string("BNHighLevelILOperation",
+                                     hlil_ops, "HLIL_"))
+    parts.append("\n")
+    parts.append(emit_enum_from_string("BNHighLevelILOperation",
+                                       hlil_ops, "HLIL_"))
     output = "".join(parts)
     ENUMS_OUT.write_text(output, encoding="utf-8", newline="\n")
     print(f"wrote {ENUMS_OUT} ({len(output)} bytes, "
-          f"{len(llil_ops)} LLIL ops + {len(llfc)} LLFC conds)")
+          f"{len(llil_ops)} LLIL ops + {len(llfc)} LLFC conds + "
+          f"{len(mlil_ops)} MLIL ops + {len(hlil_ops)} HLIL ops)")
     return len(llil_ops), len(llfc)
 
 
 def emit_operands() -> int:
-    if not PY_LLIL.exists():
-        print(f"error: missing {PY_LLIL}", file=sys.stderr)
-        return -1
-    source = PY_LLIL.read_text(encoding="utf-8")
-    extractor = DetailedOperandsExtractor(source)
+    for p in (PY_LLIL, PY_MLIL, PY_HLIL):
+        if not p.exists():
+            print(f"error: missing {p}", file=sys.stderr)
+            return -1
+    llil_source = PY_LLIL.read_text(encoding="utf-8")
+    llil_extractor = DetailedOperandsExtractor(llil_source, "LLIL")
+    mlil_source = PY_MLIL.read_text(encoding="utf-8")
+    mlil_extractor = DetailedOperandsExtractor(mlil_source, "MLIL")
+    hlil_source = PY_HLIL.read_text(encoding="utf-8")
+    hlil_extractor = DetailedOperandsExtractor(hlil_source, "HLIL")
 
     llil_ops = extract_enumerators(BN_HEADER, *LLIL_OP_LINES, "LLIL_")
+    mlil_ops = extract_enumerators(BN_HEADER, *MLIL_OP_LINES, "MLIL_")
+    hlil_ops = extract_enumerators(BN_HEADER, *HLIL_OP_LINES, "HLIL_")
+
     parts: List[str] = [OPERANDS_HEADER, "\n"]
-    parts.append(emit_operands_table(llil_ops, extractor))
+    parts.append("// ---- BNLowLevelILOperation operand specs ----\n\n")
+    parts.append(emit_operands_table(
+        llil_ops, llil_extractor, "LLIL", "BNLowLevelILOperation"))
+    parts.append("\n")
+    parts.append("// ---- BNMediumLevelILOperation operand specs ----\n\n")
+    parts.append(emit_operands_table(
+        mlil_ops, mlil_extractor, "MLIL", "BNMediumLevelILOperation"))
+    parts.append("\n")
+    parts.append("// ---- BNHighLevelILOperation operand specs ----\n\n")
+    parts.append(emit_operands_table(
+        hlil_ops, hlil_extractor, "HLIL", "BNHighLevelILOperation"))
 
     output = "".join(parts)
     OPERANDS_OUT.write_text(output, encoding="utf-8", newline="\n")
 
-    covered = sum(1 for op in llil_ops if extractor.specs_for_op(op))
-    unresolved: List[Tuple[str, str]] = []
+    llil_covered = sum(
+        1 for op in llil_ops if llil_extractor.specs_for_op(op))
+    mlil_covered = sum(
+        1 for op in mlil_ops if mlil_extractor.specs_for_op(op))
+    hlil_covered = sum(
+        1 for op in hlil_ops if hlil_extractor.specs_for_op(op))
+    unresolved: List[Tuple[str, str, str]] = []
     for op in llil_ops:
-        for name, tag, _, _ in extractor.specs_for_op(op):
+        for name, tag, _, _ in llil_extractor.specs_for_op(op):
             if tag == "unknown":
-                unresolved.append((op, name))
+                unresolved.append(("LLIL", op, name))
+    for op in mlil_ops:
+        for name, tag, _, _ in mlil_extractor.specs_for_op(op):
+            if tag == "unknown":
+                unresolved.append(("MLIL", op, name))
+    for op in hlil_ops:
+        for name, tag, _, _ in hlil_extractor.specs_for_op(op):
+            if tag == "unknown":
+                unresolved.append(("HLIL", op, name))
     print(f"wrote {OPERANDS_OUT} ({len(output)} bytes, "
-          f"{covered}/{len(llil_ops)} opcodes with non-empty specs, "
-          f"{len(unresolved)} unresolved field(s))")
+          f"LLIL {llil_covered}/{len(llil_ops)} + "
+          f"MLIL {mlil_covered}/{len(mlil_ops)} + "
+          f"HLIL {hlil_covered}/{len(hlil_ops)} opcodes with non-empty "
+          f"specs, {len(unresolved)} unresolved field(s))")
     if unresolved:
         print("unresolved fields (emitted with tag=\"unknown\"):",
               file=sys.stderr)
-        for op, name in unresolved[:20]:
-            print(f"  {op}.{name}", file=sys.stderr)
+        for fam, op, name in unresolved[:20]:
+            print(f"  {fam} {op}.{name}", file=sys.stderr)
         if len(unresolved) > 20:
             print(f"  ... and {len(unresolved) - 20} more",
                   file=sys.stderr)

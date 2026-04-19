@@ -27,6 +27,153 @@ PATCH bump signals additive-only changes.
 
 - _nothing yet_
 
+## [0.3.1] - unreleased
+
+PATCH release under the semver policy in `docs/versioning.md` — the
+wave is strictly additive relative to v0.3.0 with no breaking changes
+to any previously shipped Lua-visible surface. Ships the R9.2 MLIL and
+R9.3 HLIL operand-walking waves, completing the R9 Approach-D
+instruction-usertype family started in v0.3.0's R9.1 LLIL binding.
+
+### Added
+
+- **R9.3: `HLILInstruction` value-usertype + HLIL operand walking
+  + tree navigation** (extends `bindings/il_operand_conv.cpp`,
+  `bindings/il.h`, `bindings/il_operands_table.inc`, and
+  `bindings/il.cpp`). Introduces `BinaryNinja.HLILInstruction` as
+  the third non-`Ref<T>` value-semantics usertype in the plugin
+  after `LLILInstruction` and `MLILInstruction`. Mirrors the
+  Python `HighLevelILInstruction` surface at
+  `python/highlevelil.py:143`.
+  `HLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). New companion accessors on
+  the HighLevelILFunction side: `HLILFunction:root()` (wraps the
+  C++ `GetRootExpr()`; Python does not expose this but C++ does
+  and it is useful as a tree entry point) and
+  `HLILFunction:get_expr(expr_idx, as_ast = true)` (flat
+  expression lookup, parallel to Python
+  `HighLevelILFunction.get_expr` at
+  `python/highlevelil.py:2940`). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `source_operand`,
+  `attributes`, `operation` (short canonical string, dual-accept
+  via `EnumFromString<BNHighLevelILOperation>` for the 126
+  enumerators; commit `e13a340` landed the enum table),
+  `il_function` (`Ref<HighLevelILFunction>`), `text`. HLIL-unique
+  AST-context properties: `as_ast` (boolean), `ast`, `non_ast`.
+  SSA cross-form: `ssa_form`, `non_ssa_form`, `ssa_expr_index`.
+  HLIL-unique tree navigation: `parent` (returns
+  `Ref<HLILInstruction>` or `nil` for root/detached expressions
+  via `std::optional` marshalling, never using
+  `sol::property + sol::this_state`), `:children()` (flattened
+  union of operand slots tagged `"expr"` or `"expr_list"` in
+  operand order), `:ancestors()` (iterates via repeated
+  `GetParent()` dereferences, capped at 4096 steps defensively).
+  Projection helpers: `operands` (1-indexed value list),
+  `detailed_operands` (1-indexed `{name, value, type}` tables),
+  `prefix_operands` (prefix-order flattened walk),
+  `traverse(cb)` (depth-first pre-order collector). HLIL -> MLIL
+  cross-references: `.mlil` (scalar, `Optional`-marshalled) and
+  `:mlils()` (multi-result list from
+  `GetMediumLevelILExprIndexes`); no direct `.llil` is exposed
+  per Python's two-hop policy at
+  `python/mediumlevelil.py:697`. Metamethods: `__eq` on
+  `(function, expr_index)`, `__tostring` as
+  `"<HLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 13.3: shared
+  core (`int`, `float`, `expr`, `expr_list`, `int_list`,
+  `intrinsic`), shared with MLIL (`var`, `var_ssa`,
+  `var_ssa_list`, `ConstantData`), plus HLIL-unique `label`
+  (`{label_id, name}` with name eagerly resolved via
+  `Function::GetGotoLabelName`) and `member_index` (int64 or
+  `nil` when the high-bit sentinel is set). No `target_map` /
+  `cond` / register-level tags (HLIL drops these). 114 of the
+  126 HLIL opcodes carry non-empty operand specs; the 12
+  empty-spec opcodes are `HLIL_NOP`, `HLIL_BREAK`,
+  `HLIL_CONTINUE`, `HLIL_NORET`, `HLIL_UNREACHABLE`, `HLIL_BP`,
+  `HLIL_UNDEF`, `HLIL_UNIMPL`, `HLIL_ASSERT`, `HLIL_ASSERT_SSA`,
+  `HLIL_FORCE_VER`, `HLIL_FORCE_VER_SSA`. HLIL opcode short forms
+  include several Lua reserved words as STRING values (`"if"`,
+  `"while"`, `"for"`, `"do"`, `"return"`, `"break"`, `"goto"`,
+  `"continue"`): safe because they are string values, never
+  identifiers. Generator at `scripts/generate_il_tables.py`
+  extended to walk `python/highlevelil.py::ILOperations` +
+  per-subclass `detailed_operands`. Validation coverage in
+  `examples/validation/15_hlil.lua` (suite: 15 scripts), with
+  tree-navigation assertions as the centerpiece
+  (root/parent/children round-trip, ancestor-walk termination,
+  `HLIL_IF` / `HLIL_WHILE` / `HLIL_BLOCK` / `HLIL_ASSIGN` /
+  `HLIL_CALL` / `HLIL_VAR_PHI` / `HLIL_GOTO` /
+  `HLIL_STRUCT_FIELD` probe coverage, HLIL -> MLIL
+  cross-references).
+- **R9.2: `MLILInstruction` value-usertype + MLIL operand walking**
+  (extends `bindings/il_operand_conv.cpp`, `bindings/il.h`,
+  `bindings/il_operands_table.inc`; `bindings/il.cpp` grows
+  `RegisterMLILInstructionBindings`). Introduces
+  `BinaryNinja.MLILInstruction` as the second non-`Ref<T>`
+  value-semantics usertype in the plugin after
+  `LLILInstruction`. Mirrors the Python
+  `MediumLevelILInstruction` surface at
+  `python/mediumlevelil.py:192`.
+  `MLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `instr_index`,
+  `source_operand`, `operation` (short canonical string,
+  dual-accept via `EnumFromString<BNMediumLevelILOperation>` for
+  the 140 enumerators; commit `30bae89` landed the enum table),
+  `il_function` (`Ref<MediumLevelILFunction>`; named
+  `il_function` rather than `function` because `function` is a
+  Lua reserved word - same rule as LLIL), `attributes`,
+  `ssa_form` / `non_ssa_form` / `ssa_instr_index` /
+  `ssa_expr_index`, `text`. Projection helpers: `operands`
+  (1-indexed value list), `detailed_operands` (1-indexed
+  `{name, value, type}` tables), `prefix_operands`
+  (prefix-order flattened walk with `{operation, size}` marker
+  tables), `traverse(cb)` (depth-first pre-order collector).
+  Metamethods: `__eq` on `(function, expr_index)`, `__tostring`
+  as `"<MLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 12.3: shared
+  with LLIL (`int`, `float`, `expr`, `expr_list`, `int_list`,
+  `target_map`, `intrinsic`, `cond`) plus MLIL-specific tags
+  `var` (`{source_type, index, storage}` table reusing the
+  R2.1 `BNVariableSourceType` vocabulary), `var_ssa`
+  (`{var, version}` table), `var_list` (array of var tables),
+  `var_ssa_list` (array of var_ssa tables),
+  `var_ssa_dest_and_src` (partial SSA variable source tuple),
+  and `ConstantData` (CamelCase per Python's `ConstantDataType`,
+  `{state, value, size}` table with `state` drawn from the new
+  `EnumToString<BNRegisterValueType>` vocabulary). MLIL drops
+  all register-level tags since MLIL operates on typed variables
+  rather than raw registers. Generator at
+  `scripts/generate_il_tables.py` extended to walk
+  `python/mediumlevelil.py::ILOperations` + per-subclass
+  `detailed_operands`; 131 of the 140 MLIL opcodes carry
+  non-empty operand specs (the 9 empty-spec opcodes are
+  `MLIL_NOP`, `MLIL_NORET`, `MLIL_BP`, `MLIL_UNDEF`,
+  `MLIL_UNIMPL`, `MLIL_ASSERT`, `MLIL_ASSERT_SSA`,
+  `MLIL_FORCE_VER`, `MLIL_FORCE_VER_SSA`). Validation coverage
+  in `examples/validation/14_mlil.lua`.
+- **`EnumToString` / `EnumFromString<BNRegisterValueType>`.**
+  New dual-accept enum helpers in `bindings/common.h` covering
+  all 17 `BNRegisterValueType` enumerators including the
+  `0x8000`-bit `ConstantData*` variants (`constant_data`,
+  `constant_data_zero_extend`, `constant_data_sign_extend`,
+  `constant_data_aggregate`). Short form follows the R2.1
+  mechanical rule (strip `Value` suffix, snake_case). Used by
+  the MLIL `ConstantData` operand projection but generally
+  applicable to any dataflow-state stringification.
+
+### Changed
+
+- _nothing yet_
+
+### Fixed
+
+- _nothing yet_
+
+### Removed
+
+- _nothing yet_
+
 ## [0.3.0] - unreleased
 
 Second release under the semver practice introduced in 0.2.0. Ships
@@ -382,7 +529,8 @@ base to compare against.
 
 - Initial public release.
 
-[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/alecnunn/binja-lua/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/alecnunn/binja-lua/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alecnunn/binja-lua/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alecnunn/binja-lua/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/alecnunn/binja-lua/compare/v0.1.0...v0.1.1

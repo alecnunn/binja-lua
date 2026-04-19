@@ -378,7 +378,9 @@ blocker and it can be wired onto a future `Metadata` usertype.
 - [Llil](#llil)
 - [LLILInstruction](#llilinstruction)
 - [Mlil](#mlil)
+- [MLILInstruction](#mlilinstruction)
 - [Hlil](#hlil)
+- [HLILInstruction](#hlilinstruction)
 - [FlowGraph](#flowgraph)
 - [FlowGraphNode](#flowgraphnode)
 - [DataVariable](#datavariable)
@@ -3557,6 +3559,185 @@ Create a flow graph and wait for layout to complete
 
 ---
 
+## MLILInstruction
+
+*Single Medium Level IL instruction/expression. Returned by
+`Mlil:instruction_at(i)`. Second non-`Ref<T>` value-semantics
+usertype in the plugin after `LLILInstruction`; sol2 stores it by
+value and copies it freely. Each copy carries its own
+`Ref<MediumLevelILFunction>` internally, so the wrapper's lifetime
+is self-contained.*
+
+Operands are projected to plain Lua values (primitives, nested
+`MLILInstruction` usertypes, or plain Lua tables for Variable /
+SSAVariable / ConstantData shapes). There is no separate operand
+usertype — see `instr:detailed_operands()` below for the full
+vocabulary.
+
+### Properties
+
+#### `MLILInstruction.address` -> `HexAddress`
+
+Address of the underlying assembly instruction.
+
+#### `MLILInstruction.size` -> `integer`
+
+Width of the expression in bytes. Zero for control-flow / structural
+operations.
+
+#### `MLILInstruction.expr_index` -> `integer`
+
+Position in the IL function's expression list.
+
+#### `MLILInstruction.instr_index` -> `integer`
+
+Position in the IL function's top-level instruction list. Equals
+`expr_index` for top-level expressions.
+
+#### `MLILInstruction.source_operand` -> `integer`
+
+Raw decode-stream offset of the source operand. Rarely needed by
+scripts; exposed for parity with the Python API.
+
+#### `MLILInstruction.operation` -> `string`
+
+Short canonical opcode name: lowercase-with-underscores per
+`docs/il-metatable-design.md` section 12.2. Mechanical
+`MLIL_`-strip + lowercase transform. Examples:
+
+| Opcode enumerator       | `operation` string |
+| ----------------------- | ------------------ |
+| `MLIL_NOP`              | `"nop"`            |
+| `MLIL_SET_VAR`          | `"set_var"`        |
+| `MLIL_CALL_SSA`         | `"call_ssa"`       |
+| `MLIL_VAR_PHI`          | `"var_phi"`        |
+| `MLIL_FCMP_UO`          | `"fcmp_uo"`        |
+| `MLIL_MEM_PHI`          | `"mem_phi"`        |
+
+Dual-accept in `EnumFromString<BNMediumLevelILOperation>`: both the
+short form (`"set_var"`) and the verbatim enumerator
+(`"MLIL_SET_VAR"`) resolve to the same value. 140 enumerators total.
+
+#### `MLILInstruction.il_function` -> `MediumLevelILFunction`
+
+Owning Medium Level IL function. Named `il_function` rather than
+`function` for the same Lua-reserved-word reason as LLIL. No alias.
+
+#### `MLILInstruction.attributes` -> `integer`
+
+Raw `instr.attributes` bitfield. See `BNILInstructionAttribute`.
+
+#### `MLILInstruction.text` -> `string`
+
+Rendered instruction text — same tokens as
+`Mlil:get_text(instr.instr_index)`.
+
+#### `MLILInstruction.ssa_form` -> `MLILInstruction`
+
+Instruction in SSA form.
+
+#### `MLILInstruction.non_ssa_form` -> `MLILInstruction`
+
+Instruction in non-SSA form.
+
+### Methods
+
+#### `MLILInstruction:operands()` -> `table`
+
+1-indexed sequence of projected operand values, matching Python's
+`MediumLevelILInstruction.operands` at
+`python/mediumlevelil.py:490`. Each entry is whatever concrete Lua
+value the operand's type tag projects to. Use `detailed_operands`
+when you need operand names and types alongside the values.
+
+#### `MLILInstruction:detailed_operands()` -> `table`
+
+1-indexed sequence of `{name, value, type}` tables, matching Python's
+`detailed_operands`. `name` is the Python-parity field name
+(`"dest"`, `"src"`, `"left"`, `"right"`, `"condition"`, `"targets"`,
+`"output"`, `"params"`, `"var"`, `"prev"`, `"constant"`, ...).
+`type` is one of the short canonical type tags:
+
+| Tag                      | Lua value type                                      |
+| ------------------------ | --------------------------------------------------- |
+| `"int"`                  | integer                                             |
+| `"int_list"`             | array of integers                                   |
+| `"float"`                | number                                              |
+| `"expr"`                 | nested `MLILInstruction`                            |
+| `"expr_list"`            | array of nested `MLILInstruction`                   |
+| `"target_map"`           | integer->integer table (`MLIL_JUMP_TO` targets)     |
+| `"intrinsic"`            | intrinsic name string; `nil` if sentinel            |
+| `"cond"`                 | flag-condition short string (shared with LLIL)      |
+| `"var"`                  | `{source_type, index, storage}` Variable table      |
+| `"var_ssa"`              | `{var = <Variable>, version = <int>}` SSAVariable   |
+| `"var_list"`             | array of Variable tables                            |
+| `"var_ssa_list"`         | array of SSAVariable tables                         |
+| `"var_ssa_dest_and_src"` | SSAVariable table for partial SSA source/dest pair  |
+| `"ConstantData"`         | `{state, value, size}` table; `state` is a short    |
+|                          | `BNRegisterValueType` string (e.g. `"constant"`,    |
+|                          | `"constant_data_zero_extend"`)                      |
+
+The `"var"` sub-table uses the R2.1 `BNVariableSourceType`
+vocabulary for `source_type`: `"local"` (stack), `"register"`, or
+`"flag"`. `ConstantData` follows Python's Union-member name
+(CamelCase) per `docs/il-metatable-design.md` section 12.3 — all
+other MLIL tags use snake_case.
+
+Unlike LLIL, MLIL operates on typed variables rather than raw
+registers, so the LLIL tags `"reg"`, `"flag"`, `"reg_stack"`,
+`"reg_ssa"`, `"flag_ssa"`, `"reg_stack_ssa"`, `"sem_class"`,
+`"sem_group"`, `"reg_ssa_list"`, `"reg_stack_ssa_list"`,
+`"flag_ssa_list"`, `"reg_or_flag_list"`, `"reg_or_flag_ssa_list"`,
+`"reg_stack_adjust"`, `"reg_stack_ssa_dest_and_src"` never appear
+on `MLILInstruction`.
+
+**Example:**
+```lua
+local d = instr:detailed_operands()
+for _, entry in ipairs(d) do
+    print(entry.name, entry.type, entry.value)
+end
+```
+
+#### `MLILInstruction:prefix_operands()` -> `table`
+
+Prefix-order flattened walk of the expression tree. Each entry is
+either a `{operation=<short>, size=<int>}` marker table that starts
+a sub-expression, or a projected operand value, matching Python's
+`prefix_operands`.
+
+#### `MLILInstruction:traverse(cb)` -> `table`
+
+Depth-first pre-order walk. Invokes `cb(sub_instr)` at each node
+including the root. Non-`nil` callback returns accumulate into the
+returned 1-indexed table. Mirrors
+`python/mediumlevelil.py:511`.
+
+**Example:**
+```lua
+local constants = instr:traverse(function(sub)
+    if sub.operation == "const" or sub.operation == "const_ptr" then
+        return sub:detailed_operands()[1].value
+    end
+end)
+```
+
+#### `MLILInstruction:ssa_instr_index()` -> `integer`
+
+Instruction index within the SSA form of the owning IL function.
+
+#### `MLILInstruction:ssa_expr_index()` -> `integer`
+
+Expression index within the SSA form of the owning IL function.
+
+### Metamethods
+
+- `__eq`: two `MLILInstruction` wrappers compare equal when their
+  owning IL function and `expr_index` match.
+- `__tostring`: formats as `"<MLILInstruction OP @0xADDR>"`.
+
+---
+
 ## Hlil
 
 *High Level IL (HLIL) function representation. HLIL is the highest level IR, featuring structured control flow (if/while/for), compound expressions, and a representation close to source code.
@@ -3623,6 +3804,226 @@ bv:show_graph_report("HLIL Graph", graph)
 #### `Hlil:create_graph_immediate(...)` -> `FlowGraph`
 
 Create a flow graph and wait for layout to complete
+
+#### `Hlil:root()` -> `HLILInstruction`
+
+Returns the AST root of the HLIL function. HLIL-unique: HLIL
+expressions form an abstract syntax tree per function, so scripts
+that want to walk the entire function typically start here. Parallel
+to the C++ `HighLevelILFunction::GetRootExpr()` at
+`binaryninjaapi.h:15917`. Python does not expose this directly.
+
+#### `Hlil:get_expr(index, as_ast)` -> `HLILInstruction`
+
+Returns the HLIL expression at `index` (flat expression index, not
+instruction index). The optional `as_ast` boolean toggles between
+expression-context and AST-walking views; defaults to `true`.
+Parallel to Python `HighLevelILFunction.get_expr` at
+`python/highlevelil.py:2940`. Returns `nil` if `index` is out of
+range.
+
+---
+
+## HLILInstruction
+
+*Single High Level IL instruction/expression. Returned by
+`Hlil:instruction_at(i)`, `Hlil:root()`, `Hlil:get_expr(i)`, and the
+various cross-reference / tree-navigation accessors below. Third
+non-`Ref<T>` value-semantics usertype in the plugin after
+`LLILInstruction` and `MLILInstruction`; sol2 stores it by value and
+copies it freely. Each copy carries its own
+`Ref<HighLevelILFunction>` internally.*
+
+Unlike LLIL/MLIL, HLIL expressions form an AST. The
+`:children()` / `:ancestors()` methods and the `.parent` property
+are HLIL-specific and let scripts walk the tree structurally.
+Operands are projected to plain Lua values (primitives, nested
+`HLILInstruction` usertypes, Variable / SSAVariable tables, or
+`{label_id, name}` tables for the HLIL-unique `"label"` tag).
+
+**Lua-keyword callout:** several HLIL opcode short forms collide
+with Lua reserved words (`"if"`, `"while"`, `"for"`, `"do"`,
+`"return"`, `"break"`, `"goto"`, `"continue"`). These are safe as
+STRING values — they only collide when written as raw identifiers,
+which this vocabulary never does. Comparisons work naturally:
+`if instr.operation == "if" then ... end`.
+
+### Properties
+
+#### `HLILInstruction.address` -> `HexAddress`
+
+Address of the underlying source expression.
+
+#### `HLILInstruction.size` -> `integer`
+
+Width of the expression in bytes. Zero for structural / control-flow
+operations.
+
+#### `HLILInstruction.expr_index` -> `integer`
+
+Position in the IL function's expression list.
+
+#### `HLILInstruction.source_operand` -> `integer`
+
+Raw decode-stream offset of the source operand.
+
+#### `HLILInstruction.operation` -> `string`
+
+Short canonical opcode name: lowercase-with-underscores per
+`docs/il-metatable-design.md` section 13.2. Mechanical
+`HLIL_`-strip + lowercase transform. Examples:
+
+| Opcode enumerator | `operation` string |
+| ----------------- | ------------------ |
+| `HLIL_NOP`        | `"nop"`            |
+| `HLIL_ASSIGN`     | `"assign"`         |
+| `HLIL_IF`         | `"if"`             |
+| `HLIL_WHILE`      | `"while"`          |
+| `HLIL_VAR_DECLARE`| `"var_declare"`    |
+| `HLIL_FCMP_UO`    | `"fcmp_uo"`        |
+| `HLIL_UNREACHABLE`| `"unreachable"`    |
+| `HLIL_MEM_PHI`    | `"mem_phi"`        |
+
+Dual-accept in `EnumFromString<BNHighLevelILOperation>`: both the
+short form (`"assign"`) and the verbatim enumerator
+(`"HLIL_ASSIGN"`) resolve to the same value. 126 enumerators total.
+
+#### `HLILInstruction.il_function` -> `HighLevelILFunction`
+
+Owning HLIL function.
+
+#### `HLILInstruction.attributes` -> `integer`
+
+Raw `instr.attributes` bitfield.
+
+#### `HLILInstruction.text` -> `string`
+
+Rendered expression text via
+`HighLevelILFunction::GetExprText(instr)`. Expression-level (HLIL
+tokens are rendered per expression, not per top-level instruction
+like LLIL/MLIL).
+
+#### `HLILInstruction.as_ast` -> `boolean`
+
+Whether this instruction was fetched in AST context (`true`) or
+flat-expression context (`false`). HLIL-unique.
+
+#### `HLILInstruction.ast` -> `HLILInstruction`
+
+Same expression in AST context.
+
+#### `HLILInstruction.non_ast` -> `HLILInstruction`
+
+Same expression in non-AST (flat-expression) context.
+
+#### `HLILInstruction.ssa_form` -> `HLILInstruction`
+
+Instruction in SSA form.
+
+#### `HLILInstruction.non_ssa_form` -> `HLILInstruction`
+
+Instruction in non-SSA form.
+
+#### `HLILInstruction.parent` -> `HLILInstruction` or `nil`
+
+Parent expression in the AST, or `nil` for the root / detached
+expressions. HLIL-unique.
+
+#### `HLILInstruction.mlil` -> `MLILInstruction` or `nil`
+
+MLIL expression this HLIL expression maps back to, or `nil` if no
+mapping is available. HLIL does not expose a direct `.llil`
+accessor; scripts wanting LLIL go via `hlil.mlil.low_level_il` per
+Python's two-hop policy at `python/mediumlevelil.py:697`.
+
+### Methods
+
+#### `HLILInstruction:operands()` -> `table`
+
+1-indexed sequence of projected operand values. Matches Python's
+`HighLevelILInstruction.operands` at `python/highlevelil.py:786`.
+
+#### `HLILInstruction:detailed_operands()` -> `table`
+
+1-indexed sequence of `{name, value, type}` tables. `name` is the
+Python-parity field name (`"dest"`, `"src"`, `"condition"`, `"body"`,
+`"target"`, `"member_index"`, etc.). `type` is one of the short
+canonical type tags:
+
+| Tag              | Lua value type                                  |
+| ---------------- | ----------------------------------------------- |
+| `"int"`          | integer                                         |
+| `"int_list"`     | array of integers                               |
+| `"float"`        | number                                          |
+| `"expr"`         | nested `HLILInstruction`                        |
+| `"expr_list"`    | array of nested `HLILInstruction`               |
+| `"intrinsic"`    | intrinsic name string; `nil` if sentinel        |
+| `"var"`          | `{source_type, index, storage}` Variable table  |
+| `"var_ssa"`      | `{var, version}` SSAVariable table              |
+| `"var_ssa_list"` | array of SSAVariable tables                    |
+| `"ConstantData"` | `{state, value, size}` table (shared with MLIL) |
+| `"label"`        | `{label_id, name}` — HLIL-unique; `name` is    |
+|                  | the string from `GetGotoLabelName`, `nil` if    |
+|                  | anonymous                                       |
+| `"member_index"` | integer, or `nil` when the high-bit sentinel is |
+|                  | set (HLIL-unique; for `HLIL_STRUCT_FIELD` and   |
+|                  | `HLIL_DEREF_FIELD`)                             |
+
+HLIL does not use `"target_map"`, `"cond"`, or register-level tags
+(`"reg"`, `"flag"`, etc.) — HLIL abstracts away both register-level
+and flow-control-map concerns.
+
+#### `HLILInstruction:prefix_operands()` -> `table`
+
+Prefix-order flattened walk of the expression tree. Same
+`{operation, size}` marker shape as LLIL/MLIL.
+
+#### `HLILInstruction:traverse(cb)` -> `table`
+
+Depth-first pre-order walk. Invokes `cb(sub_instr)` at each node
+including the root. Non-`nil` callback returns accumulate into the
+returned 1-indexed table. Mirrors
+`python/highlevelil.py::HighLevelILInstruction.traverse`.
+
+#### `HLILInstruction:children()` -> `table`
+
+HLIL-unique. Returns the flattened union of operand slots tagged
+`"expr"` or `"expr_list"` in operand order. For example, an
+`HLIL_IF` yields `{condition, true_branch, false_branch}`; an
+`HLIL_BLOCK` yields its body expressions in order.
+
+**Example:**
+```lua
+local kids = instr:children()
+for _, child in ipairs(kids) do
+    print(child.operation, child.address)
+end
+```
+
+#### `HLILInstruction:ancestors()` -> `table`
+
+HLIL-unique. Returns a 1-indexed table of ancestor `HLILInstruction`
+usertypes walking from the immediate parent up to the root. The
+walk terminates at the first expression whose `.parent` is `nil`;
+there is a defensive cap of 4096 steps to guard against corrupt
+analysis state with cyclic parents.
+
+#### `HLILInstruction:ssa_expr_index()` -> `integer`
+
+Expression index within the SSA form of the owning IL function.
+
+#### `HLILInstruction:mlils()` -> `table`
+
+HLIL -> MLIL multi-result cross-reference. Returns a 1-indexed
+table of `MLILInstruction` usertypes for every MLIL expression that
+maps back to this HLIL expression. Mirrors Python
+`HighLevelILInstruction.mlils` at `python/highlevelil.py:578`.
+
+### Metamethods
+
+- `__eq`: two `HLILInstruction` wrappers compare equal when their
+  owning IL function and `expr_index` match.
+- `__tostring`: formats as `"<HLILInstruction OP @0xADDR>"`.
 
 ---
 
