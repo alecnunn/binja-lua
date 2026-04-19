@@ -53,6 +53,10 @@ struct LLILOperandSpec {
 // once the declaration is visible.
 const char* EnumToString(BNLowLevelILOperation v);
 const char* EnumToString(BNLowLevelILFlagCondition v);
+// R9.2 addition. Definition lives in il_operand_conv.cpp via the
+// regenerated il_enums.inc. No TU references this yet in commit A
+// (enums-only); MLILInstruction usertype in commit B will use it.
+const char* EnumToString(BNMediumLevelILOperation v);
 
 // Per-opcode dispatch. Returns a reference to a static empty vector
 // when the opcode has no detailed_operands override in Python (e.g.
