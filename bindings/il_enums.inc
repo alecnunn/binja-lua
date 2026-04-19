@@ -11,18 +11,28 @@
 //   - EnumToString / EnumFromString for BNMediumLevelILOperation
 //     (140 enumerators from binaryninjacore.h:1338-1488). Added in
 //     R9.2 commit A.
+//   - EnumToString / EnumFromString for BNHighLevelILOperation
+//     (126 enumerators from binaryninjacore.h:1521-1658). Added in
+//     R9.3 commit A.
 //
 // Short-form vocabulary: mechanical prefix-strip + lowercase. So
 // LLIL_SET_REG -> "set_reg", LLIL_CMP_SLT -> "cmp_slt",
 // LLFC_E -> "e", LLFC_FUO -> "fuo", MLIL_SET_VAR -> "set_var",
-// MLIL_CALL_SSA -> "call_ssa". See docs/il-metatable-design.md
-// section 4.2 / 4.2a for the LLIL ratification and section 12.2
-// for the MLIL extension.
+// MLIL_CALL_SSA -> "call_ssa", HLIL_ASSIGN -> "assign",
+// HLIL_VAR_DECLARE -> "var_declare". See
+// docs/il-metatable-design.md section 4.2 / 4.2a for LLIL, section
+// 12.2 for MLIL, and section 13.2 for HLIL.
 //
 // Dual-accept: EnumFromString accepts BOTH the short canonical form
 // AND the verbatim BN/Python enumerator name (e.g. "set_reg" or
-// "LLIL_SET_REG", "set_var" or "MLIL_SET_VAR"). Case-sensitive
-// match.
+// "LLIL_SET_REG", "set_var" or "MLIL_SET_VAR", "assign" or
+// "HLIL_ASSIGN"). Case-sensitive match.
+//
+// HLIL gotcha: a handful of HLIL opcodes short-form into Lua
+// reserved words ("if", "while", "for", "do", "return",
+// "break", "goto", "continue"). These are safe as STRING
+// values; they only collide with identifiers if written as raw
+// names, which this vocabulary never does.
 //
 // This file is included by bindings/il_operand_conv.cpp inside the
 // BinjaLua namespace. It is a .inc fragment, not a standalone
@@ -677,5 +687,271 @@ std::optional<BNMediumLevelILOperation> EnumFromString<BNMediumLevelILOperation>
     if (s == "free_var_slot_ssa" || s == "MLIL_FREE_VAR_SLOT_SSA") return MLIL_FREE_VAR_SLOT_SSA;
     if (s == "var_phi" || s == "MLIL_VAR_PHI") return MLIL_VAR_PHI;
     if (s == "mem_phi" || s == "MLIL_MEM_PHI") return MLIL_MEM_PHI;
+    return std::nullopt;
+}
+
+// ---- BNHighLevelILOperation ----
+
+const char* EnumToString(BNHighLevelILOperation v) {
+    switch (v) {
+        case HLIL_NOP: return "nop";
+        case HLIL_BLOCK: return "block";
+        case HLIL_IF: return "if";
+        case HLIL_WHILE: return "while";
+        case HLIL_DO_WHILE: return "do_while";
+        case HLIL_FOR: return "for";
+        case HLIL_SWITCH: return "switch";
+        case HLIL_CASE: return "case";
+        case HLIL_BREAK: return "break";
+        case HLIL_CONTINUE: return "continue";
+        case HLIL_JUMP: return "jump";
+        case HLIL_RET: return "ret";
+        case HLIL_NORET: return "noret";
+        case HLIL_GOTO: return "goto";
+        case HLIL_LABEL: return "label";
+        case HLIL_VAR_DECLARE: return "var_declare";
+        case HLIL_VAR_INIT: return "var_init";
+        case HLIL_ASSIGN: return "assign";
+        case HLIL_ASSIGN_UNPACK: return "assign_unpack";
+        case HLIL_FORCE_VER: return "force_ver";
+        case HLIL_ASSERT: return "assert";
+        case HLIL_VAR: return "var";
+        case HLIL_STRUCT_FIELD: return "struct_field";
+        case HLIL_ARRAY_INDEX: return "array_index";
+        case HLIL_SPLIT: return "split";
+        case HLIL_DEREF: return "deref";
+        case HLIL_DEREF_FIELD: return "deref_field";
+        case HLIL_ADDRESS_OF: return "address_of";
+        case HLIL_CONST: return "const";
+        case HLIL_CONST_DATA: return "const_data";
+        case HLIL_CONST_PTR: return "const_ptr";
+        case HLIL_EXTERN_PTR: return "extern_ptr";
+        case HLIL_FLOAT_CONST: return "float_const";
+        case HLIL_IMPORT: return "import";
+        case HLIL_ADD: return "add";
+        case HLIL_ADC: return "adc";
+        case HLIL_SUB: return "sub";
+        case HLIL_SBB: return "sbb";
+        case HLIL_AND: return "and";
+        case HLIL_OR: return "or";
+        case HLIL_XOR: return "xor";
+        case HLIL_LSL: return "lsl";
+        case HLIL_LSR: return "lsr";
+        case HLIL_ASR: return "asr";
+        case HLIL_ROL: return "rol";
+        case HLIL_RLC: return "rlc";
+        case HLIL_ROR: return "ror";
+        case HLIL_RRC: return "rrc";
+        case HLIL_MUL: return "mul";
+        case HLIL_MULU_DP: return "mulu_dp";
+        case HLIL_MULS_DP: return "muls_dp";
+        case HLIL_DIVU: return "divu";
+        case HLIL_DIVU_DP: return "divu_dp";
+        case HLIL_DIVS: return "divs";
+        case HLIL_DIVS_DP: return "divs_dp";
+        case HLIL_MODU: return "modu";
+        case HLIL_MODU_DP: return "modu_dp";
+        case HLIL_MODS: return "mods";
+        case HLIL_MODS_DP: return "mods_dp";
+        case HLIL_NEG: return "neg";
+        case HLIL_NOT: return "not";
+        case HLIL_SX: return "sx";
+        case HLIL_ZX: return "zx";
+        case HLIL_LOW_PART: return "low_part";
+        case HLIL_CALL: return "call";
+        case HLIL_CMP_E: return "cmp_e";
+        case HLIL_CMP_NE: return "cmp_ne";
+        case HLIL_CMP_SLT: return "cmp_slt";
+        case HLIL_CMP_ULT: return "cmp_ult";
+        case HLIL_CMP_SLE: return "cmp_sle";
+        case HLIL_CMP_ULE: return "cmp_ule";
+        case HLIL_CMP_SGE: return "cmp_sge";
+        case HLIL_CMP_UGE: return "cmp_uge";
+        case HLIL_CMP_SGT: return "cmp_sgt";
+        case HLIL_CMP_UGT: return "cmp_ugt";
+        case HLIL_TEST_BIT: return "test_bit";
+        case HLIL_BOOL_TO_INT: return "bool_to_int";
+        case HLIL_ADD_OVERFLOW: return "add_overflow";
+        case HLIL_SYSCALL: return "syscall";
+        case HLIL_TAILCALL: return "tailcall";
+        case HLIL_INTRINSIC: return "intrinsic";
+        case HLIL_BP: return "bp";
+        case HLIL_TRAP: return "trap";
+        case HLIL_UNDEF: return "undef";
+        case HLIL_UNIMPL: return "unimpl";
+        case HLIL_UNIMPL_MEM: return "unimpl_mem";
+        case HLIL_FADD: return "fadd";
+        case HLIL_FSUB: return "fsub";
+        case HLIL_FMUL: return "fmul";
+        case HLIL_FDIV: return "fdiv";
+        case HLIL_FSQRT: return "fsqrt";
+        case HLIL_FNEG: return "fneg";
+        case HLIL_FABS: return "fabs";
+        case HLIL_FLOAT_TO_INT: return "float_to_int";
+        case HLIL_INT_TO_FLOAT: return "int_to_float";
+        case HLIL_FLOAT_CONV: return "float_conv";
+        case HLIL_ROUND_TO_INT: return "round_to_int";
+        case HLIL_FLOOR: return "floor";
+        case HLIL_CEIL: return "ceil";
+        case HLIL_FTRUNC: return "ftrunc";
+        case HLIL_FCMP_E: return "fcmp_e";
+        case HLIL_FCMP_NE: return "fcmp_ne";
+        case HLIL_FCMP_LT: return "fcmp_lt";
+        case HLIL_FCMP_LE: return "fcmp_le";
+        case HLIL_FCMP_GE: return "fcmp_ge";
+        case HLIL_FCMP_GT: return "fcmp_gt";
+        case HLIL_FCMP_O: return "fcmp_o";
+        case HLIL_FCMP_UO: return "fcmp_uo";
+        case HLIL_UNREACHABLE: return "unreachable";
+        case HLIL_WHILE_SSA: return "while_ssa";
+        case HLIL_DO_WHILE_SSA: return "do_while_ssa";
+        case HLIL_FOR_SSA: return "for_ssa";
+        case HLIL_VAR_INIT_SSA: return "var_init_ssa";
+        case HLIL_ASSIGN_MEM_SSA: return "assign_mem_ssa";
+        case HLIL_ASSIGN_UNPACK_MEM_SSA: return "assign_unpack_mem_ssa";
+        case HLIL_FORCE_VER_SSA: return "force_ver_ssa";
+        case HLIL_ASSERT_SSA: return "assert_ssa";
+        case HLIL_VAR_SSA: return "var_ssa";
+        case HLIL_ARRAY_INDEX_SSA: return "array_index_ssa";
+        case HLIL_DEREF_SSA: return "deref_ssa";
+        case HLIL_DEREF_FIELD_SSA: return "deref_field_ssa";
+        case HLIL_CALL_SSA: return "call_ssa";
+        case HLIL_SYSCALL_SSA: return "syscall_ssa";
+        case HLIL_INTRINSIC_SSA: return "intrinsic_ssa";
+        case HLIL_VAR_PHI: return "var_phi";
+        case HLIL_MEM_PHI: return "mem_phi";
+    }
+    return "unknown";
+}
+
+template <>
+std::optional<BNHighLevelILOperation> EnumFromString<BNHighLevelILOperation>(
+    const std::string& s) {
+    if (s == "nop" || s == "HLIL_NOP") return HLIL_NOP;
+    if (s == "block" || s == "HLIL_BLOCK") return HLIL_BLOCK;
+    if (s == "if" || s == "HLIL_IF") return HLIL_IF;
+    if (s == "while" || s == "HLIL_WHILE") return HLIL_WHILE;
+    if (s == "do_while" || s == "HLIL_DO_WHILE") return HLIL_DO_WHILE;
+    if (s == "for" || s == "HLIL_FOR") return HLIL_FOR;
+    if (s == "switch" || s == "HLIL_SWITCH") return HLIL_SWITCH;
+    if (s == "case" || s == "HLIL_CASE") return HLIL_CASE;
+    if (s == "break" || s == "HLIL_BREAK") return HLIL_BREAK;
+    if (s == "continue" || s == "HLIL_CONTINUE") return HLIL_CONTINUE;
+    if (s == "jump" || s == "HLIL_JUMP") return HLIL_JUMP;
+    if (s == "ret" || s == "HLIL_RET") return HLIL_RET;
+    if (s == "noret" || s == "HLIL_NORET") return HLIL_NORET;
+    if (s == "goto" || s == "HLIL_GOTO") return HLIL_GOTO;
+    if (s == "label" || s == "HLIL_LABEL") return HLIL_LABEL;
+    if (s == "var_declare" || s == "HLIL_VAR_DECLARE") return HLIL_VAR_DECLARE;
+    if (s == "var_init" || s == "HLIL_VAR_INIT") return HLIL_VAR_INIT;
+    if (s == "assign" || s == "HLIL_ASSIGN") return HLIL_ASSIGN;
+    if (s == "assign_unpack" || s == "HLIL_ASSIGN_UNPACK") return HLIL_ASSIGN_UNPACK;
+    if (s == "force_ver" || s == "HLIL_FORCE_VER") return HLIL_FORCE_VER;
+    if (s == "assert" || s == "HLIL_ASSERT") return HLIL_ASSERT;
+    if (s == "var" || s == "HLIL_VAR") return HLIL_VAR;
+    if (s == "struct_field" || s == "HLIL_STRUCT_FIELD") return HLIL_STRUCT_FIELD;
+    if (s == "array_index" || s == "HLIL_ARRAY_INDEX") return HLIL_ARRAY_INDEX;
+    if (s == "split" || s == "HLIL_SPLIT") return HLIL_SPLIT;
+    if (s == "deref" || s == "HLIL_DEREF") return HLIL_DEREF;
+    if (s == "deref_field" || s == "HLIL_DEREF_FIELD") return HLIL_DEREF_FIELD;
+    if (s == "address_of" || s == "HLIL_ADDRESS_OF") return HLIL_ADDRESS_OF;
+    if (s == "const" || s == "HLIL_CONST") return HLIL_CONST;
+    if (s == "const_data" || s == "HLIL_CONST_DATA") return HLIL_CONST_DATA;
+    if (s == "const_ptr" || s == "HLIL_CONST_PTR") return HLIL_CONST_PTR;
+    if (s == "extern_ptr" || s == "HLIL_EXTERN_PTR") return HLIL_EXTERN_PTR;
+    if (s == "float_const" || s == "HLIL_FLOAT_CONST") return HLIL_FLOAT_CONST;
+    if (s == "import" || s == "HLIL_IMPORT") return HLIL_IMPORT;
+    if (s == "add" || s == "HLIL_ADD") return HLIL_ADD;
+    if (s == "adc" || s == "HLIL_ADC") return HLIL_ADC;
+    if (s == "sub" || s == "HLIL_SUB") return HLIL_SUB;
+    if (s == "sbb" || s == "HLIL_SBB") return HLIL_SBB;
+    if (s == "and" || s == "HLIL_AND") return HLIL_AND;
+    if (s == "or" || s == "HLIL_OR") return HLIL_OR;
+    if (s == "xor" || s == "HLIL_XOR") return HLIL_XOR;
+    if (s == "lsl" || s == "HLIL_LSL") return HLIL_LSL;
+    if (s == "lsr" || s == "HLIL_LSR") return HLIL_LSR;
+    if (s == "asr" || s == "HLIL_ASR") return HLIL_ASR;
+    if (s == "rol" || s == "HLIL_ROL") return HLIL_ROL;
+    if (s == "rlc" || s == "HLIL_RLC") return HLIL_RLC;
+    if (s == "ror" || s == "HLIL_ROR") return HLIL_ROR;
+    if (s == "rrc" || s == "HLIL_RRC") return HLIL_RRC;
+    if (s == "mul" || s == "HLIL_MUL") return HLIL_MUL;
+    if (s == "mulu_dp" || s == "HLIL_MULU_DP") return HLIL_MULU_DP;
+    if (s == "muls_dp" || s == "HLIL_MULS_DP") return HLIL_MULS_DP;
+    if (s == "divu" || s == "HLIL_DIVU") return HLIL_DIVU;
+    if (s == "divu_dp" || s == "HLIL_DIVU_DP") return HLIL_DIVU_DP;
+    if (s == "divs" || s == "HLIL_DIVS") return HLIL_DIVS;
+    if (s == "divs_dp" || s == "HLIL_DIVS_DP") return HLIL_DIVS_DP;
+    if (s == "modu" || s == "HLIL_MODU") return HLIL_MODU;
+    if (s == "modu_dp" || s == "HLIL_MODU_DP") return HLIL_MODU_DP;
+    if (s == "mods" || s == "HLIL_MODS") return HLIL_MODS;
+    if (s == "mods_dp" || s == "HLIL_MODS_DP") return HLIL_MODS_DP;
+    if (s == "neg" || s == "HLIL_NEG") return HLIL_NEG;
+    if (s == "not" || s == "HLIL_NOT") return HLIL_NOT;
+    if (s == "sx" || s == "HLIL_SX") return HLIL_SX;
+    if (s == "zx" || s == "HLIL_ZX") return HLIL_ZX;
+    if (s == "low_part" || s == "HLIL_LOW_PART") return HLIL_LOW_PART;
+    if (s == "call" || s == "HLIL_CALL") return HLIL_CALL;
+    if (s == "cmp_e" || s == "HLIL_CMP_E") return HLIL_CMP_E;
+    if (s == "cmp_ne" || s == "HLIL_CMP_NE") return HLIL_CMP_NE;
+    if (s == "cmp_slt" || s == "HLIL_CMP_SLT") return HLIL_CMP_SLT;
+    if (s == "cmp_ult" || s == "HLIL_CMP_ULT") return HLIL_CMP_ULT;
+    if (s == "cmp_sle" || s == "HLIL_CMP_SLE") return HLIL_CMP_SLE;
+    if (s == "cmp_ule" || s == "HLIL_CMP_ULE") return HLIL_CMP_ULE;
+    if (s == "cmp_sge" || s == "HLIL_CMP_SGE") return HLIL_CMP_SGE;
+    if (s == "cmp_uge" || s == "HLIL_CMP_UGE") return HLIL_CMP_UGE;
+    if (s == "cmp_sgt" || s == "HLIL_CMP_SGT") return HLIL_CMP_SGT;
+    if (s == "cmp_ugt" || s == "HLIL_CMP_UGT") return HLIL_CMP_UGT;
+    if (s == "test_bit" || s == "HLIL_TEST_BIT") return HLIL_TEST_BIT;
+    if (s == "bool_to_int" || s == "HLIL_BOOL_TO_INT") return HLIL_BOOL_TO_INT;
+    if (s == "add_overflow" || s == "HLIL_ADD_OVERFLOW") return HLIL_ADD_OVERFLOW;
+    if (s == "syscall" || s == "HLIL_SYSCALL") return HLIL_SYSCALL;
+    if (s == "tailcall" || s == "HLIL_TAILCALL") return HLIL_TAILCALL;
+    if (s == "intrinsic" || s == "HLIL_INTRINSIC") return HLIL_INTRINSIC;
+    if (s == "bp" || s == "HLIL_BP") return HLIL_BP;
+    if (s == "trap" || s == "HLIL_TRAP") return HLIL_TRAP;
+    if (s == "undef" || s == "HLIL_UNDEF") return HLIL_UNDEF;
+    if (s == "unimpl" || s == "HLIL_UNIMPL") return HLIL_UNIMPL;
+    if (s == "unimpl_mem" || s == "HLIL_UNIMPL_MEM") return HLIL_UNIMPL_MEM;
+    if (s == "fadd" || s == "HLIL_FADD") return HLIL_FADD;
+    if (s == "fsub" || s == "HLIL_FSUB") return HLIL_FSUB;
+    if (s == "fmul" || s == "HLIL_FMUL") return HLIL_FMUL;
+    if (s == "fdiv" || s == "HLIL_FDIV") return HLIL_FDIV;
+    if (s == "fsqrt" || s == "HLIL_FSQRT") return HLIL_FSQRT;
+    if (s == "fneg" || s == "HLIL_FNEG") return HLIL_FNEG;
+    if (s == "fabs" || s == "HLIL_FABS") return HLIL_FABS;
+    if (s == "float_to_int" || s == "HLIL_FLOAT_TO_INT") return HLIL_FLOAT_TO_INT;
+    if (s == "int_to_float" || s == "HLIL_INT_TO_FLOAT") return HLIL_INT_TO_FLOAT;
+    if (s == "float_conv" || s == "HLIL_FLOAT_CONV") return HLIL_FLOAT_CONV;
+    if (s == "round_to_int" || s == "HLIL_ROUND_TO_INT") return HLIL_ROUND_TO_INT;
+    if (s == "floor" || s == "HLIL_FLOOR") return HLIL_FLOOR;
+    if (s == "ceil" || s == "HLIL_CEIL") return HLIL_CEIL;
+    if (s == "ftrunc" || s == "HLIL_FTRUNC") return HLIL_FTRUNC;
+    if (s == "fcmp_e" || s == "HLIL_FCMP_E") return HLIL_FCMP_E;
+    if (s == "fcmp_ne" || s == "HLIL_FCMP_NE") return HLIL_FCMP_NE;
+    if (s == "fcmp_lt" || s == "HLIL_FCMP_LT") return HLIL_FCMP_LT;
+    if (s == "fcmp_le" || s == "HLIL_FCMP_LE") return HLIL_FCMP_LE;
+    if (s == "fcmp_ge" || s == "HLIL_FCMP_GE") return HLIL_FCMP_GE;
+    if (s == "fcmp_gt" || s == "HLIL_FCMP_GT") return HLIL_FCMP_GT;
+    if (s == "fcmp_o" || s == "HLIL_FCMP_O") return HLIL_FCMP_O;
+    if (s == "fcmp_uo" || s == "HLIL_FCMP_UO") return HLIL_FCMP_UO;
+    if (s == "unreachable" || s == "HLIL_UNREACHABLE") return HLIL_UNREACHABLE;
+    if (s == "while_ssa" || s == "HLIL_WHILE_SSA") return HLIL_WHILE_SSA;
+    if (s == "do_while_ssa" || s == "HLIL_DO_WHILE_SSA") return HLIL_DO_WHILE_SSA;
+    if (s == "for_ssa" || s == "HLIL_FOR_SSA") return HLIL_FOR_SSA;
+    if (s == "var_init_ssa" || s == "HLIL_VAR_INIT_SSA") return HLIL_VAR_INIT_SSA;
+    if (s == "assign_mem_ssa" || s == "HLIL_ASSIGN_MEM_SSA") return HLIL_ASSIGN_MEM_SSA;
+    if (s == "assign_unpack_mem_ssa" || s == "HLIL_ASSIGN_UNPACK_MEM_SSA") return HLIL_ASSIGN_UNPACK_MEM_SSA;
+    if (s == "force_ver_ssa" || s == "HLIL_FORCE_VER_SSA") return HLIL_FORCE_VER_SSA;
+    if (s == "assert_ssa" || s == "HLIL_ASSERT_SSA") return HLIL_ASSERT_SSA;
+    if (s == "var_ssa" || s == "HLIL_VAR_SSA") return HLIL_VAR_SSA;
+    if (s == "array_index_ssa" || s == "HLIL_ARRAY_INDEX_SSA") return HLIL_ARRAY_INDEX_SSA;
+    if (s == "deref_ssa" || s == "HLIL_DEREF_SSA") return HLIL_DEREF_SSA;
+    if (s == "deref_field_ssa" || s == "HLIL_DEREF_FIELD_SSA") return HLIL_DEREF_FIELD_SSA;
+    if (s == "call_ssa" || s == "HLIL_CALL_SSA") return HLIL_CALL_SSA;
+    if (s == "syscall_ssa" || s == "HLIL_SYSCALL_SSA") return HLIL_SYSCALL_SSA;
+    if (s == "intrinsic_ssa" || s == "HLIL_INTRINSIC_SSA") return HLIL_INTRINSIC_SSA;
+    if (s == "var_phi" || s == "HLIL_VAR_PHI") return HLIL_VAR_PHI;
+    if (s == "mem_phi" || s == "HLIL_MEM_PHI") return HLIL_MEM_PHI;
     return std::nullopt;
 }

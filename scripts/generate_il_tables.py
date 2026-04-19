@@ -42,6 +42,9 @@ LLFC_LINES = (739, 765)
 # BNMediumLevelILOperation block verified by grep on
 # binaryninjacore.h:1338-1488 (140 enumerators). Added for R9.2.
 MLIL_OP_LINES = (1338, 1488)
+# BNHighLevelILOperation block verified by grep on
+# binaryninjacore.h:1521-1658 (126 enumerators). Added for R9.3.
+HLIL_OP_LINES = (1521, 1658)
 
 # Map Python _get_X accessor name -> (type_tag, arg_count). arg_count
 # tells us how many slot indexes to consume: 1 for single-slot and
@@ -165,18 +168,28 @@ ENUMS_HEADER = """\
 //   - EnumToString / EnumFromString for BNMediumLevelILOperation
 //     (140 enumerators from binaryninjacore.h:1338-1488). Added in
 //     R9.2 commit A.
+//   - EnumToString / EnumFromString for BNHighLevelILOperation
+//     (126 enumerators from binaryninjacore.h:1521-1658). Added in
+//     R9.3 commit A.
 //
 // Short-form vocabulary: mechanical prefix-strip + lowercase. So
 // LLIL_SET_REG -> \"set_reg\", LLIL_CMP_SLT -> \"cmp_slt\",
 // LLFC_E -> \"e\", LLFC_FUO -> \"fuo\", MLIL_SET_VAR -> \"set_var\",
-// MLIL_CALL_SSA -> \"call_ssa\". See docs/il-metatable-design.md
-// section 4.2 / 4.2a for the LLIL ratification and section 12.2
-// for the MLIL extension.
+// MLIL_CALL_SSA -> \"call_ssa\", HLIL_ASSIGN -> \"assign\",
+// HLIL_VAR_DECLARE -> \"var_declare\". See
+// docs/il-metatable-design.md section 4.2 / 4.2a for LLIL, section
+// 12.2 for MLIL, and section 13.2 for HLIL.
 //
 // Dual-accept: EnumFromString accepts BOTH the short canonical form
 // AND the verbatim BN/Python enumerator name (e.g. \"set_reg\" or
-// \"LLIL_SET_REG\", \"set_var\" or \"MLIL_SET_VAR\"). Case-sensitive
-// match.
+// \"LLIL_SET_REG\", \"set_var\" or \"MLIL_SET_VAR\", \"assign\" or
+// \"HLIL_ASSIGN\"). Case-sensitive match.
+//
+// HLIL gotcha: a handful of HLIL opcodes short-form into Lua
+// reserved words (\"if\", \"while\", \"for\", \"do\", \"return\",
+// \"break\", \"goto\", \"continue\"). These are safe as STRING
+// values; they only collide with identifiers if written as raw
+// names, which this vocabulary never does.
 //
 // This file is included by bindings/il_operand_conv.cpp inside the
 // BinjaLua namespace. It is a .inc fragment, not a standalone
@@ -529,6 +542,7 @@ def emit_enums() -> Tuple[int, int]:
     llil_ops = extract_enumerators(BN_HEADER, *LLIL_OP_LINES, "LLIL_")
     llfc = extract_enumerators(BN_HEADER, *LLFC_LINES, "LLFC_")
     mlil_ops = extract_enumerators(BN_HEADER, *MLIL_OP_LINES, "MLIL_")
+    hlil_ops = extract_enumerators(BN_HEADER, *HLIL_OP_LINES, "HLIL_")
     if len(llil_ops) != 143:
         print(f"error: expected 143 LLIL opcodes, got {len(llil_ops)}",
               file=sys.stderr)
@@ -539,6 +553,10 @@ def emit_enums() -> Tuple[int, int]:
         return -1, -1
     if len(mlil_ops) != 140:
         print(f"error: expected 140 MLIL opcodes, got {len(mlil_ops)}",
+              file=sys.stderr)
+        return -1, -1
+    if len(hlil_ops) != 126:
+        print(f"error: expected 126 HLIL opcodes, got {len(hlil_ops)}",
               file=sys.stderr)
         return -1, -1
 
@@ -563,11 +581,18 @@ def emit_enums() -> Tuple[int, int]:
     parts.append("\n")
     parts.append(emit_enum_from_string("BNMediumLevelILOperation",
                                        mlil_ops, "MLIL_"))
+    parts.append("\n")
+    parts.append("// ---- BNHighLevelILOperation ----\n\n")
+    parts.append(emit_enum_to_string("BNHighLevelILOperation",
+                                     hlil_ops, "HLIL_"))
+    parts.append("\n")
+    parts.append(emit_enum_from_string("BNHighLevelILOperation",
+                                       hlil_ops, "HLIL_"))
     output = "".join(parts)
     ENUMS_OUT.write_text(output, encoding="utf-8", newline="\n")
     print(f"wrote {ENUMS_OUT} ({len(output)} bytes, "
           f"{len(llil_ops)} LLIL ops + {len(llfc)} LLFC conds + "
-          f"{len(mlil_ops)} MLIL ops)")
+          f"{len(mlil_ops)} MLIL ops + {len(hlil_ops)} HLIL ops)")
     return len(llil_ops), len(llfc)
 
 
