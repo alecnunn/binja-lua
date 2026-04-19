@@ -24,6 +24,8 @@ constexpr const char* MLIL_METATABLE = "BinaryNinja.MLIL";
 constexpr const char* HLIL_METATABLE = "BinaryNinja.HLIL";
 constexpr const char* LLIL_INSTRUCTION_METATABLE =
     "BinaryNinja.LLILInstruction";
+constexpr const char* MLIL_INSTRUCTION_METATABLE =
+    "BinaryNinja.MLILInstruction";
 constexpr const char* HEXADDRESS_METATABLE = "BinaryNinja.HexAddress";
 constexpr const char* DATAVARIABLE_METATABLE = "BinaryNinja.DataVariable";
 constexpr const char* TYPE_METATABLE = "BinaryNinja.Type";
@@ -65,6 +67,8 @@ void RegisterSectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterSelectionBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterILBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterLLILInstructionBindings(sol::state_view lua,
+                                       Ref<Logger> logger);
+void RegisterMLILInstructionBindings(sol::state_view lua,
                                        Ref<Logger> logger);
 void RegisterHexAddressBindings(sol::state_view lua, Ref<Logger> logger);
 void RegisterDataVariableBindings(sol::state_view lua, Ref<Logger> logger);
@@ -353,6 +357,34 @@ inline const char* EnumToString(BNTagTypeType type) {
     return "unknown";
 }
 
+// BNRegisterValueType is used by the R9.2 ConstantData projection
+// (MLIL_CONST_DATA.constant.state). Short vocabulary follows the
+// R2.1 mechanical snake_case transform: strip a "Value" suffix when
+// present, then lower+underscore. Includes the 0x8000-bit ConstantData*
+// variants used by MLIL ConstantData results.
+inline const char* EnumToString(BNRegisterValueType t) {
+    switch (t) {
+        case UndeterminedValue:            return "undetermined";
+        case EntryValue:                   return "entry";
+        case ConstantValue:                return "constant";
+        case ConstantPointerValue:         return "constant_pointer";
+        case ExternalPointerValue:         return "external_pointer";
+        case StackFrameOffset:             return "stack_frame_offset";
+        case ReturnAddressValue:           return "return_address";
+        case ImportedAddressValue:         return "imported_address";
+        case SignedRangeValue:             return "signed_range";
+        case UnsignedRangeValue:           return "unsigned_range";
+        case LookupTableValue:             return "lookup_table";
+        case InSetOfValues:                return "in_set_of";
+        case NotInSetOfValues:             return "not_in_set_of";
+        case ConstantDataValue:            return "constant_data";
+        case ConstantDataZeroExtendValue:  return "constant_data_zero_extend";
+        case ConstantDataSignExtendValue:  return "constant_data_sign_extend";
+        case ConstantDataAggregateValue:   return "constant_data_aggregate";
+    }
+    return "unknown";
+}
+
 // Dual-accept reverse lookup for every enum that has an EnumToString
 // helper. Each specialization accepts BOTH the short canonical Lua
 // string produced by EnumToString (e.g. "unconditional", "Function",
@@ -609,6 +641,46 @@ inline std::optional<BNTagTypeType> EnumFromString<BNTagTypeType>(
         return NotificationTagType;
     if (s == "bookmarks" || s == "BookmarksTagType")
         return BookmarksTagType;
+    return std::nullopt;
+}
+
+template <>
+inline std::optional<BNRegisterValueType>
+EnumFromString<BNRegisterValueType>(const std::string& s) {
+    if (s == "undetermined" || s == "UndeterminedValue")
+        return UndeterminedValue;
+    if (s == "entry" || s == "EntryValue") return EntryValue;
+    if (s == "constant" || s == "ConstantValue") return ConstantValue;
+    if (s == "constant_pointer" || s == "ConstantPointerValue")
+        return ConstantPointerValue;
+    if (s == "external_pointer" || s == "ExternalPointerValue")
+        return ExternalPointerValue;
+    if (s == "stack_frame_offset" || s == "StackFrameOffset")
+        return StackFrameOffset;
+    if (s == "return_address" || s == "ReturnAddressValue")
+        return ReturnAddressValue;
+    if (s == "imported_address" || s == "ImportedAddressValue")
+        return ImportedAddressValue;
+    if (s == "signed_range" || s == "SignedRangeValue")
+        return SignedRangeValue;
+    if (s == "unsigned_range" || s == "UnsignedRangeValue")
+        return UnsignedRangeValue;
+    if (s == "lookup_table" || s == "LookupTableValue")
+        return LookupTableValue;
+    if (s == "in_set_of" || s == "InSetOfValues") return InSetOfValues;
+    if (s == "not_in_set_of" || s == "NotInSetOfValues")
+        return NotInSetOfValues;
+    if (s == "constant_data" || s == "ConstantDataValue")
+        return ConstantDataValue;
+    if (s == "constant_data_zero_extend" ||
+        s == "ConstantDataZeroExtendValue")
+        return ConstantDataZeroExtendValue;
+    if (s == "constant_data_sign_extend" ||
+        s == "ConstantDataSignExtendValue")
+        return ConstantDataSignExtendValue;
+    if (s == "constant_data_aggregate" ||
+        s == "ConstantDataAggregateValue")
+        return ConstantDataAggregateValue;
     return std::nullopt;
 }
 

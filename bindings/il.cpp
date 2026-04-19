@@ -111,12 +111,20 @@ void RegisterILBindings(sol::state_view lua, Ref<Logger> logger) {
             return il.GetFunction();
         },
 
-        "instruction_at", [](sol::this_state ts, MediumLevelILFunction& il, size_t index) -> sol::object {
+        // Replaces the R9.0 stub that returned {index = N}. Returns
+        // a BinaryNinja.MLILInstruction usertype registered by
+        // RegisterMLILInstructionBindings (see this file). Index
+        // out of range surfaces as nil - same contract as Python's
+        // MediumLevelILFunction[i] subscript, which raises IndexError;
+        // Lua scripts check for nil.
+        "instruction_at",
+        [](sol::this_state ts, MediumLevelILFunction& il, size_t index)
+            -> sol::object {
             sol::state_view lua(ts);
-            if (index >= il.GetInstructionCount()) return sol::nil;
-            sol::table result = lua.create_table();
-            result["index"] = index;
-            return result;
+            if (index >= il.GetInstructionCount()) {
+                return sol::make_object(lua, sol::lua_nil_t{});
+            }
+            return sol::make_object(lua, il[index]);
         },
 
         "get_text", [](MediumLevelILFunction& il, size_t index) -> std::string {
@@ -337,6 +345,123 @@ void RegisterLLILInstructionBindings(sol::state_view lua,
     );
 
     if (logger) logger->LogDebug("LLILInstruction bindings registered");
+}
+
+void RegisterMLILInstructionBindings(sol::state_view lua,
+                                      Ref<Logger> logger) {
+    if (logger) logger->LogDebug("Registering MLILInstruction bindings");
+
+    // Second value-usertype in the plugin after LLILInstruction.
+    // sol2 stores MediumLevelILInstruction by value; the internal
+    // Ref<MediumLevelILFunction> pins the owning IL function for the
+    // wrapper's lifetime (see top-of-file note for the LLIL analog).
+    //
+    // sol2 3.3.0 + MSVC HARD RULE: same as LLIL. Projection helpers
+    // (operands / detailed_operands / prefix_operands / traverse)
+    // bind as METHODS with sol::this_state as the first parameter,
+    // not as sol::property wrappers. SSA cross-form accessors
+    // (ssa_form / non_ssa_form) and scalar fields stay as
+    // sol::property because they do not need the Lua state.
+    lua.new_usertype<MediumLevelILInstruction>(MLIL_INSTRUCTION_METATABLE,
+        sol::no_constructor,
+
+        // Scalar fields from the BN struct base.
+        "size", &MediumLevelILInstruction::size,
+        "expr_index", &MediumLevelILInstruction::exprIndex,
+        "instr_index", &MediumLevelILInstruction::instructionIndex,
+        "source_operand", &MediumLevelILInstruction::sourceOperand,
+        "attributes", &MediumLevelILInstruction::attributes,
+
+        // Address wrapped in HexAddress for consistent printing.
+        "address", sol::property(
+            [](const MediumLevelILInstruction& i) -> HexAddress {
+                return HexAddress(i.address);
+            }),
+
+        // Short canonical lowercase-underscore opcode name. Python
+        // parity: MLIL_SET_VAR -> "set_var".
+        "operation", sol::property(
+            [](const MediumLevelILInstruction& i) -> std::string {
+                return std::string(EnumToString(i.operation));
+            }),
+
+        // Owning IL function as an existing Ref<T> usertype. Same
+        // `il_function` naming as LLIL: `function` is a Lua reserved
+        // word and cannot be used as an identifier in
+        // `instr.function`-style access.
+        "il_function", sol::property(
+            [](const MediumLevelILInstruction& i)
+                -> Ref<MediumLevelILFunction> { return i.function; }),
+
+        // Operand-projection accessors. sol::this_state-carrying
+        // methods, so bound as plain methods per the hard rule.
+        "operands", &BuildMLILOperandsTable,
+        "detailed_operands", &BuildMLILDetailedOperandsTable,
+        "prefix_operands", &BuildMLILPrefixOperandsTable,
+
+        // SSA cross-form. No sol::this_state, so sol::property is
+        // safe. `ssa_instr_index` / `ssa_expr_index` are bound as
+        // plain methods with zero args; sol2 auto-invokes zero-arg
+        // methods on property access so Lua scripts can write
+        // `instr:ssa_expr_index()` or (via auto-invoke) plain access.
+        "ssa_form", sol::property(
+            [](const MediumLevelILInstruction& i)
+                -> MediumLevelILInstruction {
+                return i.GetSSAForm();
+            }),
+        "non_ssa_form", sol::property(
+            [](const MediumLevelILInstruction& i)
+                -> MediumLevelILInstruction {
+                return i.GetNonSSAForm();
+            }),
+        "ssa_instr_index",
+        [](const MediumLevelILInstruction& i) -> size_t {
+            return i.GetSSAInstructionIndex();
+        },
+        "ssa_expr_index",
+        [](const MediumLevelILInstruction& i) -> size_t {
+            return i.GetSSAExprIndex();
+        },
+
+        // Rendered instruction text, same path as
+        // MLILFunction:get_text(i). sol::property-wrapped so
+        // `instr.text` returns a string directly.
+        "text", sol::property(
+            [](const MediumLevelILInstruction& i) -> std::string {
+                if (!i.function) return "";
+                Ref<Function> f = i.function->GetFunction();
+                if (!f) return "";
+                std::vector<InstructionTextToken> tokens;
+                if (i.function->GetInstructionText(
+                        f, f->GetArchitecture(),
+                        i.instructionIndex, tokens)) {
+                    std::ostringstream ss;
+                    for (const auto& t : tokens) ss << t.text;
+                    return ss.str();
+                }
+                return "";
+            }),
+
+        // Depth-first pre-order walker. Python parity:
+        // MediumLevelILInstruction.traverse.
+        "traverse", &TraverseMLILInstruction,
+
+        // Metamethods.
+        sol::meta_function::equal_to,
+        [](const MediumLevelILInstruction& a,
+           const MediumLevelILInstruction& b) -> bool {
+            return a.function.GetPtr() == b.function.GetPtr() &&
+                   a.exprIndex == b.exprIndex;
+        },
+
+        sol::meta_function::to_string,
+        [](const MediumLevelILInstruction& i) -> std::string {
+            return fmt::format("<MLILInstruction {} @0x{:x}>",
+                               EnumToString(i.operation), i.address);
+        }
+    );
+
+    if (logger) logger->LogDebug("MLILInstruction bindings registered");
 }
 
 } // namespace BinjaLua

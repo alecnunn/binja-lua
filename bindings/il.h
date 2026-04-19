@@ -2,19 +2,20 @@
 //
 // R9.1 commit 2a: LLILOperandSpec struct + per-opcode dispatch
 // declaration. R9.1 commit 2b: projection helpers + traverse worker.
-//
-// MLIL and HLIL siblings (R9.2 / R9.3) will add MLILOperandSpec and
-// HLILOperandSpec structs here when they land.
+// R9.2 commit B: MLILOperandSpec + MLIL projection + MLILInstruction
+// usertype registration. HLIL sibling (R9.3) will add the analogous
+// HLIL declarations.
 
 #pragma once
 
 #include "common.h"
 
-// Full definitions of LowLevelILInstruction and the LowLevelIL*List
-// container classes. binaryninjaapi.h only forward-declares them
-// (line 14052), so we need the full header to call GetRawOperandAs*
+// Full definitions of LowLevelILInstruction / MediumLevelILInstruction
+// and the *List container classes. binaryninjaapi.h only forward-
+// declares them, so we need the full headers to call GetRawOperandAs*
 // methods and to iterate the list containers.
 #include "lowlevelilinstruction.h"
+#include "mediumlevelilinstruction.h"
 
 #include <cstdint>
 #include <vector>
@@ -35,6 +36,25 @@ namespace BinjaLua {
 // GetRawOperandAs*List consumes the (size, operand_idx) pair from a
 // single slot argument internally.
 struct LLILOperandSpec {
+    const char* name;
+    const char* type_tag;
+    uint8_t slot_first;
+    uint8_t slot_last;
+};
+
+// Per-operand spec for MLIL. Field-identical to LLILOperandSpec by
+// design (see docs/il-metatable-design.md section 12.5); kept as a
+// distinct type so the generator and projection dispatcher are
+// compile-time-separate between the families - a future HLIL tag
+// that does not exist in MLIL cannot sneak into the LLIL dispatcher
+// via accidental struct aliasing. Tag vocabulary extends LLIL's with
+// MLIL-specific tags: "var", "var_ssa", "var_list", "var_ssa_list",
+// "var_ssa_dest_and_src", "ConstantData" (CamelCase per Python's
+// ConstantDataType, per spec section 12.3 gotcha). MLIL drops all
+// register-level tags (reg, flag, reg_stack, sem_class, sem_group,
+// reg_ssa, flag_ssa, reg_stack_ssa, reg_*_list) since MLIL operates
+// on typed variables rather than raw registers.
+struct MLILOperandSpec {
     const char* name;
     const char* type_tag;
     uint8_t slot_first;
@@ -106,6 +126,50 @@ sol::table BuildLLILPrefixOperandsTable(
 // mirroring python/lowlevelil.py:741 traverse semantics.
 sol::table TraverseLLILInstruction(sol::this_state ts,
                                     const LowLevelILInstruction& instr,
+                                    sol::function cb);
+
+// ---- MLIL analogs (R9.2 commit B) ----
+
+// Per-opcode dispatch for MLIL. Returns a reference to a static empty
+// vector when the opcode has no detailed_operands override in Python
+// (MLIL_NOP, MLIL_NORET, MLIL_BP, MLIL_UNDEF, MLIL_UNIMPL, plus any
+// opcodes whose subclass is not concretely defined). Generated in
+// bindings/il_operands_table.inc alongside the LLIL dispatcher.
+const std::vector<MLILOperandSpec>& MLILOperandSpecsForOperation(
+    BNMediumLevelILOperation op);
+
+// Resolve the owning Architecture for a MediumLevelILInstruction, or
+// nullptr when the IL function has no attached BN Function. Mirrors
+// the LLIL overload above.
+Ref<Architecture> ArchFor(const MediumLevelILInstruction& instr);
+
+// Project a single MLIL operand spec to a Lua value. Tag vocabulary
+// is the MLIL-specific set documented at
+// docs/il-metatable-design.md section 12.3: "int", "float", "expr",
+// "expr_list", "int_list", "var", "var_ssa", "var_list",
+// "var_ssa_list", "var_ssa_dest_and_src", "ConstantData",
+// "target_map", "intrinsic", "cond". Unknown tags (including LLIL-
+// only tags) return sol::nil.
+sol::object MLILOperandToLua(sol::state_view lua,
+                              const MediumLevelILInstruction& instr,
+                              const MLILOperandSpec& spec);
+
+// Build the 1-indexed `instr.operands` list for an MLIL instruction.
+sol::table BuildMLILOperandsTable(sol::this_state ts,
+                                   const MediumLevelILInstruction& instr);
+
+// Build the 1-indexed `instr.detailed_operands` list for an MLIL
+// instruction. Each entry is {name=..., value=..., type=...}.
+sol::table BuildMLILDetailedOperandsTable(
+    sol::this_state ts, const MediumLevelILInstruction& instr);
+
+// Prefix-order flattened walk of the MLIL expression tree.
+sol::table BuildMLILPrefixOperandsTable(
+    sol::this_state ts, const MediumLevelILInstruction& instr);
+
+// Depth-first pre-order walk for MLIL.
+sol::table TraverseMLILInstruction(sol::this_state ts,
+                                    const MediumLevelILInstruction& instr,
                                     sol::function cb);
 
 }  // namespace BinjaLua
