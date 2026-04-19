@@ -13,7 +13,62 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
-- _nothing yet_
+- **R9.2: `MLILInstruction` value-usertype + MLIL operand walking**
+  (extends `bindings/il_operand_conv.cpp`, `bindings/il.h`,
+  `bindings/il_operands_table.inc`; `bindings/il.cpp` grows
+  `RegisterMLILInstructionBindings`). Introduces
+  `BinaryNinja.MLILInstruction` as the second non-`Ref<T>`
+  value-semantics usertype in the plugin after
+  `LLILInstruction`. Mirrors the Python
+  `MediumLevelILInstruction` surface at
+  `python/mediumlevelil.py:192`.
+  `MLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `instr_index`,
+  `source_operand`, `operation` (short canonical string,
+  dual-accept via `EnumFromString<BNMediumLevelILOperation>` for
+  the 140 enumerators; commit `30bae89` landed the enum table),
+  `il_function` (`Ref<MediumLevelILFunction>`; named
+  `il_function` rather than `function` because `function` is a
+  Lua reserved word - same rule as LLIL), `attributes`,
+  `ssa_form` / `non_ssa_form` / `ssa_instr_index` /
+  `ssa_expr_index`, `text`. Projection helpers: `operands`
+  (1-indexed value list), `detailed_operands` (1-indexed
+  `{name, value, type}` tables), `prefix_operands`
+  (prefix-order flattened walk with `{operation, size}` marker
+  tables), `traverse(cb)` (depth-first pre-order collector).
+  Metamethods: `__eq` on `(function, expr_index)`, `__tostring`
+  as `"<MLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 12.3: shared
+  with LLIL (`int`, `float`, `expr`, `expr_list`, `int_list`,
+  `target_map`, `intrinsic`, `cond`) plus MLIL-specific tags
+  `var` (`{source_type, index, storage}` table reusing the
+  R2.1 `BNVariableSourceType` vocabulary), `var_ssa`
+  (`{var, version}` table), `var_list` (array of var tables),
+  `var_ssa_list` (array of var_ssa tables),
+  `var_ssa_dest_and_src` (partial SSA variable source tuple),
+  and `ConstantData` (CamelCase per Python's `ConstantDataType`,
+  `{state, value, size}` table with `state` drawn from the new
+  `EnumToString<BNRegisterValueType>` vocabulary). MLIL drops
+  all register-level tags since MLIL operates on typed variables
+  rather than raw registers. Generator at
+  `scripts/generate_il_tables.py` extended to walk
+  `python/mediumlevelil.py::ILOperations` + per-subclass
+  `detailed_operands`; 131 of the 140 MLIL opcodes carry
+  non-empty operand specs (the 9 empty-spec opcodes are
+  `MLIL_NOP`, `MLIL_NORET`, `MLIL_BP`, `MLIL_UNDEF`,
+  `MLIL_UNIMPL`, `MLIL_ASSERT`, `MLIL_ASSERT_SSA`,
+  `MLIL_FORCE_VER`, `MLIL_FORCE_VER_SSA`). Validation coverage
+  in `examples/validation/14_mlil.lua`.
+- **`EnumToString` / `EnumFromString<BNRegisterValueType>`.**
+  New dual-accept enum helpers in `bindings/common.h` covering
+  all 17 `BNRegisterValueType` enumerators including the
+  `0x8000`-bit `ConstantData*` variants (`constant_data`,
+  `constant_data_zero_extend`, `constant_data_sign_extend`,
+  `constant_data_aggregate`). Short form follows the R2.1
+  mechanical rule (strip `Value` suffix, snake_case). Used by
+  the MLIL `ConstantData` operand projection but generally
+  applicable to any dataflow-state stringification.
 
 ### Changed
 
