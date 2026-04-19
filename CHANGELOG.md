@@ -13,6 +13,74 @@ PATCH bump signals additive-only changes.
 
 ### Added
 
+- **R9.3: `HLILInstruction` value-usertype + HLIL operand walking
+  + tree navigation** (extends `bindings/il_operand_conv.cpp`,
+  `bindings/il.h`, `bindings/il_operands_table.inc`, and
+  `bindings/il.cpp`). Introduces `BinaryNinja.HLILInstruction` as
+  the third non-`Ref<T>` value-semantics usertype in the plugin
+  after `LLILInstruction` and `MLILInstruction`. Mirrors the
+  Python `HighLevelILInstruction` surface at
+  `python/highlevelil.py:143`.
+  `HLILFunction:instruction_at(i)` now returns a live instruction
+  usertype (was a `{index = i}` stub). New companion accessors on
+  the HighLevelILFunction side: `HLILFunction:root()` (wraps the
+  C++ `GetRootExpr()`; Python does not expose this but C++ does
+  and it is useful as a tree entry point) and
+  `HLILFunction:get_expr(expr_idx, as_ast = true)` (flat
+  expression lookup, parallel to Python
+  `HighLevelILFunction.get_expr` at
+  `python/highlevelil.py:2940`). Per-instruction properties:
+  `address` (HexAddress), `size`, `expr_index`, `source_operand`,
+  `attributes`, `operation` (short canonical string, dual-accept
+  via `EnumFromString<BNHighLevelILOperation>` for the 126
+  enumerators; commit `e13a340` landed the enum table),
+  `il_function` (`Ref<HighLevelILFunction>`), `text`. HLIL-unique
+  AST-context properties: `as_ast` (boolean), `ast`, `non_ast`.
+  SSA cross-form: `ssa_form`, `non_ssa_form`, `ssa_expr_index`.
+  HLIL-unique tree navigation: `parent` (returns
+  `Ref<HLILInstruction>` or `nil` for root/detached expressions
+  via `std::optional` marshalling, never using
+  `sol::property + sol::this_state`), `:children()` (flattened
+  union of operand slots tagged `"expr"` or `"expr_list"` in
+  operand order), `:ancestors()` (iterates via repeated
+  `GetParent()` dereferences, capped at 4096 steps defensively).
+  Projection helpers: `operands` (1-indexed value list),
+  `detailed_operands` (1-indexed `{name, value, type}` tables),
+  `prefix_operands` (prefix-order flattened walk),
+  `traverse(cb)` (depth-first pre-order collector). HLIL -> MLIL
+  cross-references: `.mlil` (scalar, `Optional`-marshalled) and
+  `:mlils()` (multi-result list from
+  `GetMediumLevelILExprIndexes`); no direct `.llil` is exposed
+  per Python's two-hop policy at
+  `python/mediumlevelil.py:697`. Metamethods: `__eq` on
+  `(function, expr_index)`, `__tostring` as
+  `"<HLILInstruction OP @0x...>"`. Operand type-tag vocabulary
+  matches `docs/il-metatable-design.md` section 13.3: shared
+  core (`int`, `float`, `expr`, `expr_list`, `int_list`,
+  `intrinsic`), shared with MLIL (`var`, `var_ssa`,
+  `var_ssa_list`, `ConstantData`), plus HLIL-unique `label`
+  (`{label_id, name}` with name eagerly resolved via
+  `Function::GetGotoLabelName`) and `member_index` (int64 or
+  `nil` when the high-bit sentinel is set). No `target_map` /
+  `cond` / register-level tags (HLIL drops these). 114 of the
+  126 HLIL opcodes carry non-empty operand specs; the 12
+  empty-spec opcodes are `HLIL_NOP`, `HLIL_BREAK`,
+  `HLIL_CONTINUE`, `HLIL_NORET`, `HLIL_UNREACHABLE`, `HLIL_BP`,
+  `HLIL_UNDEF`, `HLIL_UNIMPL`, `HLIL_ASSERT`, `HLIL_ASSERT_SSA`,
+  `HLIL_FORCE_VER`, `HLIL_FORCE_VER_SSA`. HLIL opcode short forms
+  include several Lua reserved words as STRING values (`"if"`,
+  `"while"`, `"for"`, `"do"`, `"return"`, `"break"`, `"goto"`,
+  `"continue"`): safe because they are string values, never
+  identifiers. Generator at `scripts/generate_il_tables.py`
+  extended to walk `python/highlevelil.py::ILOperations` +
+  per-subclass `detailed_operands`. Validation coverage in
+  `examples/validation/15_hlil.lua` (suite: 15 scripts), with
+  tree-navigation assertions as the centerpiece
+  (root/parent/children round-trip, ancestor-walk termination,
+  `HLIL_IF` / `HLIL_WHILE` / `HLIL_BLOCK` / `HLIL_ASSIGN` /
+  `HLIL_CALL` / `HLIL_VAR_PHI` / `HLIL_GOTO` /
+  `HLIL_STRUCT_FIELD` probe coverage, HLIL -> MLIL
+  cross-references).
 - **R9.2: `MLILInstruction` value-usertype + MLIL operand walking**
   (extends `bindings/il_operand_conv.cpp`, `bindings/il.h`,
   `bindings/il_operands_table.inc`; `bindings/il.cpp` grows
