@@ -1,15 +1,17 @@
 # binja-lua
 
-A _(hightly experimental)_ Lua scripting scripting for Binary Ninja.
+A _(highly experimental)_ Lua scripting provider for Binary Ninja.
 
 This plugin adds Lua 5.4 as a scripting language in Binary Ninja, sitting alongside Python in the scripting console. The bindings aim to feel natural to Lua users while providing access to Binary Ninja's analysis capabilities.
+
+The plugin version is available at runtime via the `binjalua` global table (`binjalua.version`, `binjalua.version_major`, etc.). See [docs/versioning.md](docs/versioning.md) for the semver policy.
 
 ## Quick Example
 
 ```lua
 -- Get info about the current binary
 print("Analyzing: " .. bv.filename)
-print("Architecture: " .. bv.arch)
+print("Architecture: " .. bv.arch.name)
 
 -- Iterate over functions
 for _, func in ipairs(bv:functions()) do
@@ -69,17 +71,20 @@ local data = bv:read(addr, 16)
 
 ## What's Included
 
-The bindings cover the core Binary Ninja API:
+The bindings cover a substantial subset of the Binary Ninja API:
 
-- **BinaryView**: File access, memory read/write, functions, symbols, sections, strings
-- **Function**: Properties, basic blocks, IL access, parameters, variables, call graph
+- **BinaryView**: File access, memory read/write, functions, symbols, sections, strings, metadata round-trip
+- **Function**: Properties, basic blocks, IL access, parameters, variables, calling convention, platform, call graph
 - **BasicBlock**: Dominators, control flow edges, instructions
-- **Types**: Structures, enums, function types, type libraries
-- **IL**: Low-level, medium-level, and high-level IL
-- **Tags & Metadata**: Bookmarks, annotations, custom metadata storage
-- **FlowGraph**: Custom graph visualization
+- **Architecture / CallingConvention / Platform**: Registers, flags, calling conventions, platform-specific types
+- **Types**: Structures, enums, function types
+- **IL**: Per-instruction operand walking for `LowLevelILFunction` / `MediumLevelILFunction` / `HighLevelILFunction` with `LLILInstruction` / `MLILInstruction` / `HLILInstruction` value-usertypes (operands, detailed_operands, prefix_operands, traverse, SSA navigation, HLIL tree navigation)
+- **Symbols & Tags**: Symbol CRUD with `Symbol.new` factory, TagType CRUD, user and auto tags
+- **Settings**: Schema-aware settings with scope-aware typed get/set, serialization
+- **FlowGraph**: Custom graph visualization with styled edges
+- **Metadata**: Full round-trip including embedded-null strings and int64 precision
 
-See the `examples/` directory for practical usage patterns, or check [docs/api-reference.md](docs/api-reference.md) for the full API.
+See [docs/api-reference.md](docs/api-reference.md) for the full API surface.
 
 ## License
 
